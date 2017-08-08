@@ -10,7 +10,8 @@ library(plyr)
 
 
 # Import data from file, ignoring special chars
-t <- read.table(file = "data.tsv", sep='\t', header=TRUE, quote='', comment.char='')
+t <- read.table(file = "data.tsv", sep='\t', header=TRUE, quote='', comment.char='',
+                encoding="UTF-8")
 # Convert MySQL datetimes to R datetimes. Attempts to use UTC+8 according to wiki 
 # but may be incorrect.
 t$approved_date <- as.POSIXct(t$approved_date, tz="Asia/Hong_Kong")
