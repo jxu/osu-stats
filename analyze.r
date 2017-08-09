@@ -104,10 +104,12 @@ head(sort(table(t$title), decreasing=TRUE), 10)
 head(sort(table(t$source), decreasing=TRUE), 10)
 head(sort(table(t$creator), decreasing=TRUE), 10)
 
-# Most favorited and played maps
-most_fav <- head(arrange(t, desc(favourite_count)), 20)
-subset(most_fav, select=c("favourite_count","creator","title","version"))
+# Most favorited mapsets (mapset defined by creator AND title)
+mapsets <- t[!duplicated(t[c("creator","title")]),]
+most_fav <- head(arrange(mapsets, desc(favourite_count)), 20)
+subset(most_fav, select=c("favourite_count","creator","title"))
 
+# Most played maps
 most_played <- head(arrange(t, desc(playcount)), 20)
 subset(most_played, select=c("playcount","creator","title","version"))
 
