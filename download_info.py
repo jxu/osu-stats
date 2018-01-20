@@ -21,6 +21,8 @@ def download_map_info():
         r = requests.get("https://osu.ppy.sh/api/get_beatmaps", params=payload)
 
         info_dicts = r.json()
+        if "error" in info_dicts: print(info_dicts)
+
         if not info_dicts: break  # Empty JSON, end of map search
 
         if not header_seen:  # Write header once
@@ -46,7 +48,7 @@ def download_map_info():
                 info_dict["version"]))
 
 
-        # When the API returns 500 results, so last mapset may have diffs cut off.
+        # When the API returns 500 results, last mapset may have diffs cut off.
         # Therefore, the whole mapset needs to be read again. The API's "since"
         # parameter appears to be exclusive, so subtract 1 second to include
         # the map again.
