@@ -5,6 +5,7 @@ import datetime
 
 def scrape_page(set_id):
     """Scrape page and return submitted date.
+    https://github.com/ppy/osu-api/issues/195
     TODO: Is there a faster site?
     """
     from bs4 import BeautifulSoup
@@ -14,6 +15,7 @@ def scrape_page(set_id):
     soup = BeautifulSoup(r.text, "html.parser")
     json_beatmapset = soup.find("script", id="json-beatmapset")
     submitted_date = json.loads(json_beatmapset.string)["submitted_date"]
+
     return submitted_date
 
 
@@ -22,7 +24,7 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
     """Main function to download and write."""
 
     API_KEY = open(api_path).read()
-    tsvfile = open(data_tsv, 'w', encoding="utf-8")
+    tsvfile = open(tsv_path, 'w', encoding="utf-8")
     since_date_str = "2007-10-07"  # Date to start at
     API_MAX_RESULTS = 500
 
@@ -30,7 +32,8 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
     header_seen = False
     header_keys = None
     mysql_timestamp_format = "%Y-%m-%d %H:%M:%S"
-    seen_rows = set()
+
+    seen_beatmap_ids = set()
     tsvwriter = csv.writer(tsvfile, delimiter='\t', lineterminator='\n')
 
 
@@ -52,18 +55,23 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
 
 
         for info_dict in info_dicts:
-            row = tuple(info_dict[key] for key in header_keys)
-            if row not in seen_rows:  # Prevent duplicate rows being written
-                tsvwriter.writerow(row)
-                seen_rows.add(row)
+            row = [info_dict[key] for key in header_keys]
 
-            # Progress info, not actually used in written file
-            print("{} {} {} - {} [{}]".format(
-                info_dict["approved_date"],
-                info_dict["beatmap_id"],
-                info_dict["artist"],
-                info_dict["title"],
-                info_dict["version"]))
+            # Prevent duplicate rows being written
+            beatmap_id = info_dict["beatmap_id"]
+            if beatmap_id not in seen_beatmap_ids:
+                tsvwriter.writerow(row)
+                seen_beatmap_ids.add(beatmap_id)
+
+                # Progress info, not actually used in written file
+                print("{} {} {} - {} [{}]".format(
+                    info_dict["approved_date"],
+                    info_dict["beatmap_id"],
+                    info_dict["artist"],
+                    info_dict["title"],
+                    info_dict["version"]))
+
+            else: print("Skipped")
 
 
         # When the API returns 500 results, last mapset may have diffs cut off.
@@ -80,11 +88,10 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
 
         print('-' * 50)
 
-        break  # for testing loop
+        #break  # for testing loop
 
 
     tsvfile.close()
 
 if __name__ == "__main__":
-    print(scrape_page(1))
-    #download_map_info()
+    download_map_info()
