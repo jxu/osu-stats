@@ -3,9 +3,26 @@ import csv
 import datetime
 
 
-def download_map_info():
-    API_KEY = open("api.key").read()
-    tsvfile = open("data.tsv", 'w', encoding="utf-8")
+def scrape_page(set_id):
+    """Scrape page and return submitted date.
+    TODO: Is there a faster site?
+    """
+    from bs4 import BeautifulSoup
+    import json
+
+    r = requests.get("http://osu.ppy.sh/s/" + str(set_id))
+    soup = BeautifulSoup(r.text, "html.parser")
+    json_beatmapset = soup.find("script", id="json-beatmapset")
+    submitted_date = json.loads(json_beatmapset.string)["submitted_date"]
+    return submitted_date
+
+
+def download_map_info(api_path="api.key", tsv_path="data.tsv",
+                      scrape=True):
+    """Main function to download and write."""
+
+    API_KEY = open(api_path).read()
+    tsvfile = open(data_tsv, 'w', encoding="utf-8")
     since_date_str = "2007-10-07"  # Date to start at
     API_MAX_RESULTS = 500
 
@@ -69,4 +86,5 @@ def download_map_info():
     tsvfile.close()
 
 if __name__ == "__main__":
-    download_map_info()
+    print(scrape_page(1))
+    #download_map_info()
