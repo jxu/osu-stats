@@ -2,6 +2,7 @@ import requests
 import csv
 import datetime
 
+
 def download_map_info():
     API_KEY = open("api.key").read()
     tsvfile = open("data.tsv", 'w', encoding="utf-8")
@@ -60,10 +61,12 @@ def download_map_info():
             end_date -= datetime.timedelta(seconds=1)
         since_date_str = end_date.strftime(mysql_timestamp_format)
 
-        print('-' * 40)
+        print('-' * 50)
+
+        break  # for testing loop
 
 
     tsvfile.close()
 
-
-download_map_info()
+if __name__ == "__main__":
+    download_map_info()
