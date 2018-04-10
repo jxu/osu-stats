@@ -61,10 +61,11 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
             row = [info_dict[key] for key in header_keys]
 
             # https://osu.ppy.sh/b/1468670?m=0 has a TAB in the tags wtf
+            #
             for i in range(len(row)):
-                if type(row[i]) == str and '\t' in row[i]:
-                    print("Tab detected!")
-                    row[i].replace('\t', ' ')
+                if type(row[i]) == str and ('\t' in row[i] or '\n' in row[i]):
+                    print("Bad whitespace detected!")
+                    row[i] = row[i].replace('\t', ' ').replace('\n', ' ')
 
 
             # Prevent duplicate rows being written
