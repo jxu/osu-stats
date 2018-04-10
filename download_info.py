@@ -20,8 +20,10 @@ def scrape_page(set_id):
 
 
 def download_map_info(api_path="api.key", tsv_path="data.tsv",
-                      scrape=True):
-    """Main function to download and write."""
+                      scrape=True, verbose=False):
+    """Main function to download and write.
+    WARNING: Scraping is probably slow! 
+    """
 
     API_KEY = open(api_path).read()
     tsvfile = open(tsv_path, 'w', encoding="utf-8")
@@ -49,13 +51,21 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
         if not header_seen:  # Write header once
             first_map = info_dicts[0]
             header_keys = sorted(first_map.keys())
-            print(header_keys)
+            if verbose: print(header_keys)
             tsvwriter.writerow(header_keys)
             header_seen = True
 
 
         for info_dict in info_dicts:
+            # Load info_dict value by header key
             row = [info_dict[key] for key in header_keys]
+
+            # https://osu.ppy.sh/b/1468670?m=0 has a TAB in the tags wtf
+            for i in range(len(row)):
+                if type(row[i]) == str and '\t' in row[i]:
+                    print("Tab detected!")
+                    row[i].replace('\t', ' ')
+
 
             # Prevent duplicate rows being written
             beatmap_id = info_dict["beatmap_id"]
@@ -63,15 +73,17 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
                 tsvwriter.writerow(row)
                 seen_beatmap_ids.add(beatmap_id)
 
-                # Progress info, not actually used in written file
-                print("{} {} {} - {} [{}]".format(
-                    info_dict["approved_date"],
-                    info_dict["beatmap_id"],
-                    info_dict["artist"],
-                    info_dict["title"],
-                    info_dict["version"]))
+                if verbose:
+                    # Progress info, not actually used in written file
+                    print("{} {} {} - {} [{}]".format(
+                        info_dict["approved_date"],
+                        info_dict["beatmap_id"],
+                        info_dict["artist"],
+                        info_dict["title"],
+                        info_dict["version"]))
 
-            else: print("Skipped")
+            else:
+                if verbose: print("Skipped")
 
 
         # When the API returns 500 results, last mapset may have diffs cut off.
@@ -86,7 +98,8 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
             end_date -= datetime.timedelta(seconds=1)
         since_date_str = end_date.strftime(mysql_timestamp_format)
 
-        print('-' * 50)
+        if verbose:
+            print('-' * 50)
 
         #break  # for testing loop
 
@@ -94,4 +107,4 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
     tsvfile.close()
 
 if __name__ == "__main__":
-    download_map_info()
+    download_map_info(verbose=True)
