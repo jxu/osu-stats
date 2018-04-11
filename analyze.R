@@ -175,17 +175,17 @@ for (i in 1:6) {
   t[diff.range,"spread_name"] = spread.names[i]
 }
 
-par(mfrow=c(2,3), mar=c(4,2,4,2))
+par(mfrow=c(2,3), mar=c(4,4,4,1))
 for (i in 1:6) {
   std.spread = t[t$spread_name == spread.names[i] & t$mode == "Standard", ]
-  hitlength.bins = seq(0, 300, 30)
+  hitlength.bins = seq(0, 360, 30)
   playcount.bin.sum = vector(length = length(hitlength.bins)-1)
   for (j in 1:length(hitlength.bins)-1) {
     hitlength.range = hitlength.bins[j] <= std.spread$hit_length & std.spread$hit_length < hitlength.bins[j+1]
     playcount.bin.sum[j] = sum(std.spread[hitlength.range,"playcount"])
   }
   
-  barplot(playcount.bin.sum, space=0, width=30, xlab="Hit length", ylab="Playcount Total", main=spread.names[i])
+  barplot(playcount.bin.sum, space=0, width=30, xlab="Hit length (s)", ylab="Playcount Total", main=spread.names[i])
   axis(1, at=hitlength.bins)
 }
 
