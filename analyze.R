@@ -168,28 +168,23 @@ ggplot(std, aes(approved_date, difficultyrating)) +
   
 # Playcount by song time, categorized by spread icon
 # https://osu.ppy.sh/help/wiki/Difficulties#star-rating Not sure about values between boundaries
-spread.sr = c(0, 1.51, 2.26, 3.76, 5.26, 6.76, Inf)  
+spread.sr = c(0, 1.51, 2.26, 3.76, 5.26, 6.76)  
 spread.names = c("Easy", "Normal", "Hard", "Insane", "Expert", "Expert+")
 spread.colors = c("olivedrab3", "paleturquoise", "gold", "hotpink", "purple", "darkgray")
 
-for (i in 1:6) {
-  diff.range = spread.sr[i] <= t$difficultyrating & t$difficultyrating < spread.sr[i+1]
-  t[diff.range,"spread_name"] = spread.names[i]
-}
+# Assign difficulty rating by spread ranges to spread names 
+t$spread_name = spread.names[cut(t$difficultyrating, spread.sr, right=FALSE, labels=FALSE)]
+std <- t[t$mode == "Standard",]  # update std 
 
-std <- t[t$mode == "Standard",]
+hitlength.bins = seq(0, 360, 30)
 par(mfrow=c(2,3), mar=c(4,4,4,1), cex.main=2)
-for (i in 1:6) {
+for (i in 1:length(spread.names)) {
   std.spread = std[std$spread_name == spread.names[i], ]
-  hitlength.bins = seq(0, 360, 30)
-  playcount.bin.sum = vector(length = length(hitlength.bins)-1)
-  for (j in 1:length(hitlength.bins)-1) {
-    hitlength.range = hitlength.bins[j] <= std.spread$hit_length & std.spread$hit_length < hitlength.bins[j+1]
-    playcount.bin.sum[j] = sum(std.spread[hitlength.range,"playcount"])
-  }
-  
+  playcount.bin.sum = sapply(split(std.spread, cut(std.spread$hit_length, hitlength.bins)),
+                             function(df) sum(df$playcount))
+
   barplot(playcount.bin.sum, space=0, width=30, xlab="Hit length (s)", ylab="Playcount Total", main=spread.names[i],
-          col=spread.colors[i])
+          col=spread.colors[i], axisnames=FALSE)
   axis(1, at=hitlength.bins)
 }
 
@@ -201,13 +196,11 @@ rownames(playcount.bin.mat) = spread.names
 
 for (i in 1:nrow(playcount.bin.mat)) {
   std.spread = std[std$spread_name == spread.names[i], ]
-  for (j in 1:ncol(playcount.bin.mat)) {
-    std.spread.subset = subset(std.spread, hitlength.bins.150[j] < hit_length & hit_length < hitlength.bins.150[j+1])
-    playcount.bin.mat[i,j] = sum(as.numeric(std.spread.subset$playcount))  # numeric for overflow
-  }
+  playcount.bin.mat[i,] = sapply(split(std.spread, cut(std.spread$hit_length, hitlength.bins.150)),
+                                 function(df) sum(df$playcount))
 }
 
-par(mfrow=c(1,1))  # Reset par 
+par(mfrow=c(1,1), cex.main=1)  # Reset par 
 barplot(playcount.bin.mat, space=0, width=30, col=spread.colors, xlab="Hitlength (s)", ylab="Total Playcount",
         legend.text=spread.names, axisnames=FALSE, main="Total Playcount by Hitlength and Difficulty")
 axis(1, at=hitlength.bins.150-hitlength.bins.150[1], labels=hitlength.bins.150)
