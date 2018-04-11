@@ -166,3 +166,26 @@ ggplot(std, aes(approved_date, difficultyrating)) +
   approved_x_scale + 
   geom_point(alpha=0.1)
   
+# Playcount by song time, categorized by spread icon
+# https://osu.ppy.sh/help/wiki/Difficulties#star-rating Not sure about values between boundaries
+spread.sr = c(0, 1.51, 2.26, 3.76, 5.26, 6.76, Inf)  
+spread.names = c("Easy", "Normal", "Hard", "Insane", "Expert", "Expert+")
+for (i in 1:6) {
+  diff.range = spread.sr[i] <= t$difficultyrating & t$difficultyrating < spread.sr[i+1]
+  t[diff.range,"spread_name"] = spread.names[i]
+}
+
+par(mfrow=c(2,3), mar=c(4,2,4,2))
+for (i in 1:6) {
+  std.spread = t[t$spread_name == spread.names[i] & t$mode == "Standard", ]
+  hitlength.bins = seq(0, 300, 30)
+  playcount.bin.sum = vector(length = length(hitlength.bins)-1)
+  for (j in 1:length(hitlength.bins)-1) {
+    hitlength.range = hitlength.bins[j] <= std.spread$hit_length & std.spread$hit_length < hitlength.bins[j+1]
+    playcount.bin.sum[j] = sum(std.spread[hitlength.range,"playcount"])
+  }
+  
+  barplot(playcount.bin.sum, space=0, width=30, xlab="Hit length", ylab="Playcount Total", main=spread.names[i])
+  axis(1, at=hitlength.bins)
+}
+
