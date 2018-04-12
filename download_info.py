@@ -1,4 +1,5 @@
 import requests
+import requests_cache
 import csv
 import datetime
 
@@ -11,7 +12,10 @@ def scrape_page(set_id):
     from bs4 import BeautifulSoup
     import json
 
-    r = requests.get("http://osu.ppy.sh/s/" + str(set_id))
+    r = requests.get("http://osu.ppy.sh/beatmapsets/" + str(set_id))
+    # testing
+    #with open("r.html", 'w') as f:
+    #    f.write(r.text)
     soup = BeautifulSoup(r.text, "html.parser")
     json_beatmapset = soup.find("script", id="json-beatmapset")
     submitted_date = json.loads(json_beatmapset.string)["submitted_date"]
@@ -36,6 +40,7 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
     header_keys = None
     mysql_timestamp_format = "%Y-%m-%d %H:%M:%S"
     scrape_headers = ["submitted_date"]
+    requests_cache.install_cache("cache")
 
     seen_beatmap_ids = set()
     set_id_dict = dict()  # (set_id: submitted_date) pairs

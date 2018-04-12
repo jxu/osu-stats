@@ -104,3 +104,4 @@ api.key
 .Rhistory
 .RData
 data.*
+*.sqlite
