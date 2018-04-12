@@ -1,33 +1,36 @@
 import requests
-import requests_cache
 import csv
 import datetime
 
 
-def scrape_page(set_id, session=None):
-    """Scrape page and return submitted date.
+def scrape_pages(set_ids):
+    """Scrape pages given by set_ids and return submitted dates.
+    Makes requests asynchronously with grequests.
     https://github.com/ppy/osu-api/issues/195
     old.ppy.sh may be faster but gives less info about dates.
-
-    Ideal world: Use twisted to make many requests at once
     """
+    import grequests
     from bs4 import BeautifulSoup
     import json
 
-    url = "http://osu.ppy.sh/beatmapsets/" + str(set_id)
-    r = session.get(url) if session else requests.get(url)
+    submitted_dates = []
+    urls = ["http://osu.ppy.sh/beatmapsets/"+str(set_id) for set_id in set_ids]
+    rs = (grequests.get(u) for u in urls)
+    for r in grequests.map(rs):
+        assert(r.status_code == 200)  # set exists
+        soup = BeautifulSoup(r.text, "html.parser")
+        json_beatmapset = soup.find("script", id="json-beatmapset")
+        submitted_date = json.loads(json_beatmapset.string)["submitted_date"]
+        submitted_dates.append(submitted_date)
 
-    soup = BeautifulSoup(r.text, "html.parser")
-    json_beatmapset = soup.find("script", id="json-beatmapset")
-    submitted_date = json.loads(json_beatmapset.string)["submitted_date"]
-
-    return submitted_date
+    assert(len(submitted_dates) == len(set_ids))
+    return submitted_dates
 
 
 def download_map_info(api_path="api.key", tsv_path="data.tsv",
-                      scrape=True, verbose=True, testing=False):
-    """Main function to download and write.
-    Scraping mode adds what scrape_page returns.
+                      scrape=True, verbose=True, testing=False, cache=True):
+    """Main function to download and write data table from API (and scraping).
+    Scraping mode adds what scrape_pages returns.
     WARNING: Scraping is probably slow! 
     """
 
@@ -41,7 +44,9 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
     header_keys = None
     mysql_timestamp_format = "%Y-%m-%d %H:%M:%S"
     scrape_headers = ["submitted_date"]
-    requests_cache.install_cache("cache")  # Caches in cache.sqlite
+    if cache:
+        import requests_cache
+        requests_cache.install_cache("cache")  # Caches in cache.sqlite
 
     seen_beatmap_ids = set()
     set_id_dict = dict()  # (set_id: submitted_date) pairs
@@ -55,7 +60,9 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
         r = session.get("https://osu.ppy.sh/api/get_beatmaps", params=payload)
 
         info_dicts = r.json()
-        if "error" in info_dicts: print(info_dicts)
+        if "error" in info_dicts:
+            print(info_dicts)
+            raise Exception("info_dict error")
 
         if not info_dicts: break  # Empty JSON, end of map search
 
@@ -71,18 +78,31 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
             tsvwriter.writerow(full_header)
             header_seen = True
 
+        if scrape:
+            # Gather set_ids in info_dicts to batch request
+            set_ids_to_request = set()
+            for info_dict in info_dicts:
+                set_id = info_dict["beatmapset_id"]
+                if set_id not in set_id_dict:
+                    set_ids_to_request.add(set_id)
+
+            set_ids_to_request = list(set_ids_to_request)  # Fix order
+            submitted_dates = scrape_pages(list(set_ids_to_request))
+            if verbose: print(submitted_dates)
+
+            # Add responses to set_id_dict
+            for (set_id, submitted_date) in zip(set_ids_to_request, submitted_dates):
+                set_id_dict[set_id] = submitted_date
+
+
 
         for info_dict in info_dicts:
             # Load info_dict value by header key
             row = [info_dict[key] for key in header_keys]
 
-            # Get set id, prevent duplicates
+            # Read from set_id_dict
             if scrape:
                 set_id = info_dict["beatmapset_id"]
-                if set_id not in set_id_dict:
-                    set_id_dict[set_id] = scrape_page(set_id, session)
-                    if verbose: print("Submitted date", set_id_dict[set_id])
-
                 # Append submitted_date
                 row.append(set_id_dict[set_id])
 
@@ -136,5 +156,5 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
     tsvfile.close()
 
 if __name__ == "__main__":
-    #print(scrape_page(1))
+    #print(scrape_pages([1,3]))
     download_map_info(verbose=True, scrape=True, testing=False)
