@@ -200,7 +200,7 @@ for (i in 1:nrow(playcount.bin.mat)) {
                                  function(df) sum(df$playcount))
 }
 
-par(mfrow=c(1,1), cex.main=1)  # Reset par 
+dev.off()  # Reset par 
 barplot(playcount.bin.mat, space=0, width=30, col=spread.colors, xlab="Hitlength (s)", ylab="Total Playcount",
         legend.text=spread.names, axisnames=FALSE, main="Total Playcount by Hitlength and Difficulty")
 axis(1, at=hitlength.bins.150-hitlength.bins.150[1], labels=hitlength.bins.150)
