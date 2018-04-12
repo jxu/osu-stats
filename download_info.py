@@ -32,11 +32,12 @@ def scrape_pages(set_ids):
 
 def download_map_info(api_path="api.key", tsv_path="data.tsv",
                       seen_path="seen.pkl", scrape=True, _testing=False,
-                      resume=True):
+                      resume=False):
     """Main function to download and write data table from API (and scraping).
     Scraping mode adds what scrape_pages returns.
     If resume flag, tries to restart based on seen file (pickle)
-    WARNING: Scraping is probably slow! 
+    WARNING: Scraping is probably slow!
+    Also resume functionality is EXPERIMENTAL.
     """
 
     API_KEY = open(api_path).read()
@@ -170,5 +171,4 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
     tsvfile.close()
 
 if __name__ == "__main__":
-    #print(scrape_pages([1,3]))
-    download_map_info(scrape=True, _testing=False)
+    download_map_info(scrape=True, _testing=False, resume=True)

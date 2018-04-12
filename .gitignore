@@ -104,5 +104,6 @@ api.key
 .Rhistory
 .RData
 data.*
+*.tsv
 *.sqlite
 *.pkl
