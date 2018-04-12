@@ -105,3 +105,4 @@ api.key
 .RData
 data.*
 *.sqlite
+*.pkl
