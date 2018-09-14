@@ -5,7 +5,7 @@ import os.path
 import pickle
 
 
-def scrape_pages(set_ids):
+def scrape_map_pages(set_ids):
     """Scrape pages given by set_ids and return submitted dates.
     Makes requests asynchronously with grequests.
     https://github.com/ppy/osu-api/issues/195
@@ -34,7 +34,7 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
                       seen_path="seen.pkl", scrape=True, _testing=False,
                       resume=False):
     """Main function to download and write data table from API (and scraping).
-    Scraping mode adds what scrape_pages returns.
+    Scraping mode adds what scrape_map_pages returns.
     If resume flag, tries to restart based on seen file (pickle)
     WARNING: Scraping is probably slow!
     Also resume functionality is EXPERIMENTAL.
@@ -99,7 +99,7 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
                     set_ids_to_request.add(set_id)
 
             set_ids_to_request = list(set_ids_to_request)  # Fix order
-            submitted_dates = scrape_pages(set_ids_to_request)
+            submitted_dates = scrape_map_pages(set_ids_to_request)
 
             # Add responses to set_id_dict
             for (set_id, submitted_date) in zip(set_ids_to_request, submitted_dates):
