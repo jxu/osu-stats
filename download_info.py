@@ -1,8 +1,12 @@
+import gevent.monkey; gevent.monkey.patch_all()
 import requests
 import csv
 import datetime
 import os.path
 import pickle
+import grequests
+from bs4 import BeautifulSoup
+import json
 
 
 def scrape_map_pages(set_ids):
@@ -11,9 +15,6 @@ def scrape_map_pages(set_ids):
     https://github.com/ppy/osu-api/issues/195
     old.ppy.sh may be faster but gives less info about dates.
     """
-    import grequests
-    from bs4 import BeautifulSoup
-    import json
 
     submitted_dates = []
     urls = ["http://osu.ppy.sh/beatmapsets/"+str(set_id) for set_id in set_ids]
@@ -41,7 +42,7 @@ class Seen:
    
     
 
-def download_map_info(api_path="api.key", tsv_path="data.tsv",
+def download_map_info(api_key, tsv_path="data.tsv",
                       seen_path="seen.pkl", scrape=True, break_early=False):
     """Main function to download and write data table from API (and scraping).
     Makes requests sequentially.
@@ -52,7 +53,8 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
     TODO: May write duplicate rows or headers again. Check.
     """
 
-    API_KEY = open(api_path).read().strip()
+
+    API_URL = "https://osu.ppy.sh/api/get_beatmaps"
     tsvfile = open(tsv_path, 'a', encoding="utf-8")
     since_date_str = "2007-10-07"  # Date to start at
     API_MAX_RESULTS = 500
@@ -74,12 +76,11 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
     tsvwriter = csv.writer(tsvfile, delimiter='\t', lineterminator='\n')
 
     # Requests session
-
     session = requests.Session()
 
     while True:
-        payload = {"k": API_KEY, "since": since_date_str}
-        r = session.get("https://osu.ppy.sh/api/get_beatmaps", params=payload)
+        payload = {"k": api_key, "since": since_date_str}
+        r = session.get(API_URL, params=payload)
 
         info_dicts = r.json()
         if "error" in info_dicts:
@@ -182,6 +183,65 @@ def download_map_info(api_path="api.key", tsv_path="data.tsv",
 
 
     tsvfile.close()
+    session.close()
+
+
+def scrape_rankings(gamemode, country, max_page):
+    '''Scrape a rankings page for user IDs.
+    https://github.com/ppy/osu-api/issues/132 '''
+    RANKINGS_URL = "https://old.ppy.sh/p/pp"
+
+    user_ids = []
+
+    session = requests.Session()
+
+    for page in range(1, max_page+1):
+        payload = {'m': gamemode, "page": page}
+        if country:
+            payload['c'] = country
+
+        r = session.get(RANKINGS_URL, params=payload)
+
+
+        soup = BeautifulSoup(r.text, "html.parser")
+        for href_tag in soup.find_all(href=True):
+            link = href_tag['href']
+            if link.startswith("/u"):
+                user_ids.append(int(link.split("/u/")[1]))
+
+
+    session.close()
+    return user_ids
+
+
+def exception_handler(request, exception):
+    print(request, exception)
+
+
+def download_rankings(api_key, gamemode=0, country=None, max_page=200,
+                      top_scores=100):
+    API_URL = "https://osu.ppy.sh/api/get_user_best"
+
+    BATCH_REQUESTS = 10  # Don't exceed 1200 requests/min and make peppy angry
+    user_ids = scrape_rankings(gamemode=gamemode, country=country,
+                               max_page=max_page)
+
+    print(user_ids)
+
+    for i in range(0, len(user_ids), BATCH_REQUESTS):
+        rs = []
+        for user_id in user_ids[i:i+BATCH_REQUESTS]:
+            payload = {'k': api_key, 'u': user_id, 'm': gamemode,
+                       "limit": top_scores}
+            rs.append(grequests.get(API_URL, params=payload))
+
+        for r in grequests.map(rs, exception_handler=exception_handler):
+            print(r.json())
+
+
 
 if __name__ == "__main__":
-    download_map_info(scrape=True, break_early=False)
+    api_path = "api.key"
+    API_KEY = open(api_path).read().strip()
+
+    download_rankings(api_key=API_KEY, gamemode=3, max_page=2)
