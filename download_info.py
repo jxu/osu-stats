@@ -217,18 +217,6 @@ def scrape_rankings(gamemode, country, max_page):
     return user_ids
 
 
-class RankingsProgress:
-    '''Organize progress to be dumped and read.'''
-
-    def dump(self, progress_file):
-        with open("progress_file", 'w') as f:
-            pickle.dump(self, f)
-
-
-
-
-
-
 def exception_handler(request, exception):
     print(request, exception)
 
@@ -237,10 +225,15 @@ def download_rankings(api_key, outfile="rankings.json",
                       progressfile="rankings_progress.pkl",
                       gamemode=0, country=None,
                       top_scores=100, start_rank=0, end_rank=10000):
+    '''Download top (100) scores of top (10k) users.
+     Due to API rate limit, progress is stored.
+     TODO: writing to progress file is slow so avoid doing too often.
+     '''
     API_URL = "https://osu.ppy.sh/api/get_user_best"
     RANKS_PER_PAGE = 50
-    BATCH_REQUESTS = 50
-    BATCH_INTERVAL = 2.5  # seconds
+    BATCH_REQUESTS = 100
+    BATCH_INTERVAL = 5  # seconds
+    PROGRESS_FREQ = 5  # How often to save progress
 
 
     if os.path.exists(progressfile):
@@ -263,6 +256,7 @@ def download_rankings(api_key, outfile="rankings.json",
 
         progress["json_list"] = []
 
+    progress_counter = 0
     for i in range(start_rank, end_rank, BATCH_REQUESTS):
         progress["start_rank"] = i  # Save start rank
         rs = []
@@ -279,10 +273,13 @@ def download_rankings(api_key, outfile="rankings.json",
         for r in grequests.map(rs, exception_handler=exception_handler):
             progress["json_list"].append(r.json())
 
-        # Save progress
-        print("Saving progress to", progressfile)
-        with open(progressfile, 'wb') as f:
-            pickle.dump(progress, f)
+        if progress_counter > 0 and progress_counter % PROGRESS_FREQ == 0:
+            # Save progress
+            print("Saving progress to", progressfile)
+            with open(progressfile, 'wb') as f:
+                pickle.dump(progress, f)
+
+        progress_counter += 1
 
         # Don't exceed 1200 requests/min and make peppy angry
         # Dumb throttling
@@ -299,7 +296,7 @@ def main():
     api_path = "api.key"
     API_KEY = open(api_path).read().strip()
 
-    download_rankings(api_key=API_KEY, gamemode=3, start_rank=0, end_rank=200)
+    download_rankings(api_key=API_KEY, gamemode=3, start_rank=0, end_rank=10000)
 
 
 
