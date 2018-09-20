@@ -217,29 +217,56 @@ def scrape_rankings(gamemode, country, max_page):
     return user_ids
 
 
+class RankingsProgress:
+    '''Organize progress to be dumped and read.'''
+
+    def dump(self, progress_file):
+        with open("progress_file", 'w') as f:
+            pickle.dump(self, f)
+
+
+
+
+
+
 def exception_handler(request, exception):
     print(request, exception)
 
 
-def download_rankings(api_key, outfile, gamemode=0, country=None,
+def download_rankings(api_key, outfile="rankings.json",
+                      progressfile="rankings_progress.pkl",
+                      gamemode=0, country=None,
                       top_scores=100, start_rank=0, end_rank=10000):
     API_URL = "https://osu.ppy.sh/api/get_user_best"
     RANKS_PER_PAGE = 50
     BATCH_REQUESTS = 50
     BATCH_INTERVAL = 2.5  # seconds
 
-    assert 0 <= start_rank < end_rank <= 10000
 
-    max_page = math.ceil(end_rank / RANKS_PER_PAGE)
-    user_ids = scrape_rankings(gamemode=gamemode, country=country,
-                               max_page=max_page)
+    if os.path.exists(progressfile):
+        print("Found progress file", progressfile)
+        with open(progressfile, 'rb') as f:
+            progress = pickle.load(f)
+            start_rank = progress["start_rank"]
+            print("Loaded start rank", start_rank)
+            print("JSON list length", len(progress["json_list"]))
 
-    print(user_ids)
-    json_list = []
+
+    else:
+        progress = dict()  # Store progress to be dumped
+        assert 0 <= start_rank < end_rank <= 10000
+
+        max_page = math.ceil(end_rank / RANKS_PER_PAGE)
+        progress["user_ids"] = \
+            scrape_rankings(gamemode=gamemode, country=country,
+                            max_page=max_page)
+
+        progress["json_list"] = []
 
     for i in range(start_rank, end_rank, BATCH_REQUESTS):
+        progress["start_rank"] = i  # Save start rank
         rs = []
-        user_ids_range = user_ids[i:i+BATCH_REQUESTS]
+        user_ids_range = progress["user_ids"][i:i+BATCH_REQUESTS]
         print(i, "User IDs", user_ids_range)
         for user_id in user_ids_range:
             payload = {'k': api_key, 'u': user_id, 'm': gamemode,
@@ -248,26 +275,31 @@ def download_rankings(api_key, outfile, gamemode=0, country=None,
 
         start_time = time.process_time()
 
+        # Store downloaded JSON
         for r in grequests.map(rs, exception_handler=exception_handler):
-            json_list.append(r.json())
+            progress["json_list"].append(r.json())
 
-        json.dump(json_list, outfile, indent=2)
+        # Save progress
+        print("Saving progress to", progressfile)
+        with open(progressfile, 'wb') as f:
+            pickle.dump(progress, f)
 
         # Don't exceed 1200 requests/min and make peppy angry
         # Dumb throttling
         time.sleep(max(0, start_time + BATCH_INTERVAL - time.process_time()))
 
 
+    # Final write
+    print("Writing JSON to", outfile)
+    with open(outfile, 'w') as f:
+        json.dump(progress["json_list"], f, indent=2)
+
 
 def main():
     api_path = "api.key"
     API_KEY = open(api_path).read().strip()
-    outfile = "rankings.json"
 
-    # APPEND MODE
-    with open(outfile, 'a') as f:
-        download_rankings(api_key=API_KEY, gamemode=3, outfile=f,
-                          start_rank=0, end_rank=200)
+    download_rankings(api_key=API_KEY, gamemode=3, start_rank=0, end_rank=200)
 
 
 
