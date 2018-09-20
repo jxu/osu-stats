@@ -7,6 +7,8 @@ import pickle
 import grequests
 from bs4 import BeautifulSoup
 import json
+import time
+import math
 
 
 def scrape_map_pages(set_ids):
@@ -196,6 +198,7 @@ def scrape_rankings(gamemode, country, max_page):
     session = requests.Session()
 
     for page in range(1, max_page+1):
+        print("Scraping rankings page", page)
         payload = {'m': gamemode, "page": page}
         if country:
             payload['c'] = country
@@ -218,30 +221,55 @@ def exception_handler(request, exception):
     print(request, exception)
 
 
-def download_rankings(api_key, gamemode=0, country=None, max_page=200,
-                      top_scores=100):
+def download_rankings(api_key, outfile, gamemode=0, country=None,
+                      top_scores=100, start_rank=0, end_rank=10000):
     API_URL = "https://osu.ppy.sh/api/get_user_best"
+    RANKS_PER_PAGE = 50
+    BATCH_REQUESTS = 50
+    BATCH_INTERVAL = 2.5  # seconds
 
-    BATCH_REQUESTS = 10  # Don't exceed 1200 requests/min and make peppy angry
+    assert 0 <= start_rank < end_rank <= 10000
+
+    max_page = math.ceil(end_rank / RANKS_PER_PAGE)
     user_ids = scrape_rankings(gamemode=gamemode, country=country,
                                max_page=max_page)
 
     print(user_ids)
+    json_list = []
 
-    for i in range(0, len(user_ids), BATCH_REQUESTS):
+    for i in range(start_rank, end_rank, BATCH_REQUESTS):
         rs = []
-        for user_id in user_ids[i:i+BATCH_REQUESTS]:
+        user_ids_range = user_ids[i:i+BATCH_REQUESTS]
+        print(i, "User IDs", user_ids_range)
+        for user_id in user_ids_range:
             payload = {'k': api_key, 'u': user_id, 'm': gamemode,
                        "limit": top_scores}
             rs.append(grequests.get(API_URL, params=payload))
 
+        start_time = time.process_time()
+
         for r in grequests.map(rs, exception_handler=exception_handler):
-            print(r.json())
+            json_list.append(r.json())
+
+        json.dump(json_list, outfile, indent=2)
+
+        # Don't exceed 1200 requests/min and make peppy angry
+        # Dumb throttling
+        time.sleep(max(0, start_time + BATCH_INTERVAL - time.process_time()))
+
+
+
+def main():
+    api_path = "api.key"
+    API_KEY = open(api_path).read().strip()
+    outfile = "rankings.json"
+
+    # APPEND MODE
+    with open(outfile, 'a') as f:
+        download_rankings(api_key=API_KEY, gamemode=3, outfile=f,
+                          start_rank=0, end_rank=200)
 
 
 
 if __name__ == "__main__":
-    api_path = "api.key"
-    API_KEY = open(api_path).read().strip()
-
-    download_rankings(api_key=API_KEY, gamemode=3, max_page=2)
+    main()
