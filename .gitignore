@@ -103,8 +103,8 @@ api.key
 .idea/
 .Rhistory
 .RData
-data.*
 *.tsv
+*.csv
 *.sqlite
 *.pkl
 *.zip
