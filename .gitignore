@@ -109,3 +109,7 @@ api.key
 *.pkl
 *.zip
 *.json
+
+# R markdown
+*/html
+*/figure-html
