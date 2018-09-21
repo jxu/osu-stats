@@ -1,6 +1,5 @@
 import gevent.monkey; gevent.monkey.patch_all()
 import requests
-import csv
 import datetime
 import os.path
 import pickle
@@ -11,27 +10,29 @@ import time
 import math
 import itertools
 
+# TODO: Rewrite progress dicts as class for download functions
+
 
 def scrape_map_pages(set_ids):
-    # TODO: rewrite using info_dicts instead of set_ids
-    """Scrape pages given by set_ids and return submitted dates.
+    """Scrape pages given by set_ids with a fixed order and returns dict
+    with (set_id: submitted_date) pairs.
     Makes requests asynchronously with grequests.
     https://github.com/ppy/osu-api/issues/195
     old.ppy.sh may be faster but gives less info about dates.
     """
     API_URL = "http://osu.ppy.sh/beatmapsets/"
 
-    submitted_dates = []
+    submitted_dates = dict()
     urls = [API_URL + str(set_id) for set_id in set_ids]
     rs = (grequests.get(u) for u in urls)
-    for r in grequests.map(rs):
+    for r, set_id in zip(grequests.map(rs), set_ids):
         assert r.status_code == 200  # set exists
 
         soup = BeautifulSoup(r.text, "html.parser")
         json_beatmapset = soup.find("script", id="json-beatmapset")
         submitted_date = json.loads(json_beatmapset.string)["submitted_date"]
         print(r.url, submitted_date)
-        submitted_dates.append(submitted_date)
+        submitted_dates[set_id] = submitted_date
 
     assert len(submitted_dates) == len(set_ids)
     return submitted_dates
@@ -102,8 +103,17 @@ def download_map_info(api_key, outfile="maps.json", since_date_str="2007-10-07",
 
 
         if scrape:
+            set_ids = set()
             # Gather set_ids in info_dicts to batch request
-            pass
+            for info_dict in info_dicts:
+                set_ids.add(info_dict["beatmapset_id"])
+
+            submitted_dates = scrape_map_pages(set_ids)
+
+            for info_dict in info_dicts:
+                info_dict["submitted_date"] = \
+                    submitted_dates[info_dict["beatmapset_id"]]
+
 
         # Write out progress
         progress["since"] = since_date_str
@@ -243,7 +253,7 @@ def main():
     api_path = "api.key"
     API_KEY = open(api_path).read().strip()
 
-    download_map_info(api_key=API_KEY, scrape=False)
+    download_map_info(api_key=API_KEY, scrape=True)
 
 
 
