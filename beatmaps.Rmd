@@ -9,7 +9,9 @@ output:
 # Introduction
 
 Basic data visualization of beatmap info provided by osu! API. https://github.com/ppy/osu-api/wiki
+
 Only uses ranked/loved/qualified maps. Graphs focusing on standard mode. 
+
 (A few maps, due to ranked/loved irregularities, are actually in graveyard but included in the API query anyway. Ex. https://osu.ppy.sh/b/766190&m=2 with 1 loved CtB diff. )
 
 ```{r}
@@ -18,6 +20,7 @@ library(gridExtra)
 library(plyr)
 library(jsonlite)
 library(varhandle)
+library(chron)
 ```
 
 ```{r, cache=TRUE}
@@ -27,6 +30,11 @@ beatmaps <- unique(do.call("rbind", fromJSON("maps.json")))
 ```
 
 ```{r}
+# Set global figure width and height
+knitr::opts_chunk$set(fig.width=10, fig.height=6) 
+# Disable warnings and messages
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+
 # Convert strings of ints and floats to numeric datatypes
 beatmaps.isintcol <- sapply(beatmaps, function(col) all(check.numeric(col, only.integer=TRUE))) 
 beatmaps.isnumcol <- sapply(beatmaps, function(col) all(check.numeric(col))) & !beatmaps.isintcol
@@ -117,15 +125,22 @@ ggplot(beatmaps, aes(playcount, color=as.factor(mode))) +
   scale_x_continuous(limits=c(0,1000000)) + 
   geom_freqpoly(binwidth=5000)
 
+beatmaps$month <- cut(beatmaps$approved_date, breaks="month")
+year_x_scale <- scale_x_discrete(breaks=unique(cut(beatmaps$approved_date, breaks="year"))) 
+rotate_x_labels <- theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
 # Histogram of date approved (all modes)
-ggplot(beatmaps, aes(approved_date, fill=as.factor(mode))) + 
-  ggtitle("Total Date Approved (All Modes)") + legend_title_fill +
-  approved_x_scale + geom_histogram(binwidth=3600*24*30)
+ggplot(beatmaps, aes(x=month, fill=mode)) + 
+  ggtitle("Date Approved (All Modes)") +
+  geom_histogram(stat="count", width=1) + 
+  year_x_scale + rotate_x_labels
 
 # Frequency polygon of date approved (all modes)
-ggplot(beatmaps, aes(approved_date, color=as.factor(mode))) +
-  ggtitle("Date Approved (All Modes)") + legend_title_color +
-  approved_x_scale + geom_freqpoly(binwidth=3600*24*30)
+ggplot(beatmaps, aes(x=month, group=mode, color=mode)) +
+  ggtitle("Date Approved (All Modes)") + 
+  legend_title_color +
+  geom_freqpoly(stat="count") +
+  year_x_scale + rotate_x_labels
 ```
 
 # Tables
