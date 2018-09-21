@@ -9,20 +9,23 @@ from bs4 import BeautifulSoup
 import json
 import time
 import math
+import itertools
 
 
 def scrape_map_pages(set_ids):
+    # TODO: rewrite using info_dicts instead of set_ids
     """Scrape pages given by set_ids and return submitted dates.
     Makes requests asynchronously with grequests.
     https://github.com/ppy/osu-api/issues/195
     old.ppy.sh may be faster but gives less info about dates.
     """
+    API_URL = "http://osu.ppy.sh/beatmapsets/"
 
     submitted_dates = []
-    urls = ["http://osu.ppy.sh/beatmapsets/"+str(set_id) for set_id in set_ids]
+    urls = [API_URL + str(set_id) for set_id in set_ids]
     rs = (grequests.get(u) for u in urls)
     for r in grequests.map(rs):
-        assert(r.status_code == 200)  # set exists
+        assert r.status_code == 200  # set exists
 
         soup = BeautifulSoup(r.text, "html.parser")
         json_beatmapset = soup.find("script", id="json-beatmapset")
@@ -30,7 +33,7 @@ def scrape_map_pages(set_ids):
         print(r.url, submitted_date)
         submitted_dates.append(submitted_date)
 
-    assert(len(submitted_dates) == len(set_ids))
+    assert len(submitted_dates) == len(set_ids)
     return submitted_dates
 
 
@@ -44,40 +47,35 @@ class Seen:
    
     
 
-def download_map_info(api_key, tsv_path="data.tsv",
-                      seen_path="seen.pkl", scrape=True, break_early=False):
+def download_map_info(api_key, outfile="maps.json", since_date_str="2007-10-07",
+                      progress_file="maps_progress.pkl", scrape=True):
     """Main function to download and write data table from API (and scraping).
     Makes requests sequentially.
     Scraping mode adds what scrape_map_pages returns.
-    If seen_path exists, tries to restart based on seen file (pickle)
+    If progress_file exists, tries to restart based on seen file (pickle)
     WARNING: Scraping is probably slow!
-    Also resume functionality is EXPERIMENTAL.
-    TODO: May write duplicate rows or headers again. Check.
+    Resume functionality appears stable, but no warranty(TM)
     """
 
-
     API_URL = "https://osu.ppy.sh/api/get_beatmaps"
-    tsvfile = open(tsv_path, 'a', encoding="utf-8")
-    since_date_str = "2007-10-07"  # Date to start at
     API_MAX_RESULTS = 500
-    
-    
-    seen = Seen()
-
     MYSQL_TIMESTAMP_FMT = "%Y-%m-%d %H:%M:%S"
-    scrape_headers = ["submitted_date"]
+
+    # Load or init progress structures
+    if os.path.isfile(progress_file):
+        print("Loading progress file", progress_file)
+        with open(progress_file, 'rb') as f:
+            progress = pickle.load(f)
 
 
-    # Load or init seen structures
-    if os.path.isfile(seen_path):
-        print("Loading seen files", seen_path)
-        with open(seen_path, 'rb') as f:
-            seen = pickle.load(f)
+        since_date_str = progress["since"]  # Load since date
+        print("Loaded since date", since_date_str)
 
 
-    tsvwriter = csv.writer(tsvfile, delimiter='\t', lineterminator='\n')
+    else:
+        progress = dict()
+        progress["json_list"] = []
 
-    # Requests session
     session = requests.Session()
 
     while True:
@@ -85,86 +83,34 @@ def download_map_info(api_key, tsv_path="data.tsv",
         r = session.get(API_URL, params=payload)
 
         info_dicts = r.json()
+        assert type(info_dicts) == list
         if "error" in info_dicts:
             print(info_dicts)
             raise Exception("info_dict error")
 
         if not info_dicts: break  # Empty JSON, end of map search
 
-        if not seen.header_seen:  # Write header once
-            first_map = info_dicts[0]
-            # First n cols of table
-            # Alternative: Use bool list to indicate whether API or scraped
-            seen.header_keys = sorted(first_map.keys())
-            full_header = seen.header_keys.copy()
-            if scrape: full_header.extend(scrape_headers)
+        progress["json_list"].append(info_dicts)
 
-            print("Full header", full_header)
-            tsvwriter.writerow(full_header)
-            seen.header_seen = True
+        for info_dict in info_dicts:
+            print("{} {} {} - {} [{}]".format(
+                  info_dict["approved_date"],
+                  info_dict["beatmap_id"],
+                  info_dict["artist"],
+                  info_dict["title"],
+                  info_dict["version"]))
+
 
         if scrape:
             # Gather set_ids in info_dicts to batch request
-            set_ids_to_request = set()
-            for info_dict in info_dicts:
-                set_id = info_dict["beatmapset_id"]
-                if set_id not in seen.set_id_dict:
-                    set_ids_to_request.add(set_id)
+            pass
 
-            set_ids_to_request = list(set_ids_to_request)  # Fix order
-            submitted_dates = scrape_map_pages(set_ids_to_request)
-
-            # Add responses to seen.set_id_dict
-            for (set_id, submitted_date) in \
-                    zip(set_ids_to_request, submitted_dates):
-                seen.set_id_dict[set_id] = submitted_date
-
-
-
-        for info_dict in info_dicts:
-            # Load info_dict value by header key
-            row = [info_dict[key] for key in seen.header_keys]
-
-            # Read from set_id_dict
-            if scrape:
-                set_id = info_dict["beatmapset_id"]
-                # Append submitted_date
-                row.append(seen.set_id_dict[set_id])
-
-
-            # Clean strings
-            # https://osu.ppy.sh/b/1468670?m=0 has a TAB in the tags
-            # https://osu.ppy.sh/b/707380 has a newline in the tags
-            for i in range(len(row)):
-                if type(row[i]) == str and ('\t' in row[i] or '\n' in row[i]):
-                    print("Bad whitespace detected!")
-                    row[i] = row[i].replace('\t', ' ').replace('\n', ' ')
-
-
-            # Write row, prevent duplicate rows being written
-            beatmap_id = info_dict["beatmap_id"]
-            if beatmap_id not in seen.seen_beatmap_ids:
-                tsvwriter.writerow(row)
-                seen.seen_beatmap_ids.add(beatmap_id)
-
-                # Progress info, not actually used in written file
-                print("{} {} {} - {} [{}]".format(
-                    info_dict["approved_date"],
-                    info_dict["beatmap_id"],
-                    info_dict["artist"],
-                    info_dict["title"],
-                    info_dict["version"]))
-
-            else:
-                print("Skipped (seen {} already)".format(beatmap_id))
-
-
-        # Write seen values
-        # Should only run AFTER API call succeeds
-        with open(seen_path, 'wb') as f:
-            pickle.dump(seen, f)
-        print("Wrote id pickle files")
-
+        # Write out progress
+        progress["since"] = since_date_str
+        print("Writing progress to", progress_file)
+        print("Maps:", len(list(itertools.chain(*progress["json_list"]))))
+        with open(progress_file, 'wb') as f:
+            pickle.dump(progress, f)
 
         # When the API returns 500 results, last mapset may have diffs cut off.
         # Therefore, the whole mapset needs to be read again. The API's "since"
@@ -179,13 +125,14 @@ def download_map_info(api_key, tsv_path="data.tsv",
             end_date -= datetime.timedelta(seconds=1)
         since_date_str = end_date.strftime(MYSQL_TIMESTAMP_FMT)
 
-        print('-' * 50)
 
-        if break_early: break
-
-
-    tsvfile.close()
     session.close()
+
+
+    # Final write
+    print("Writing final JSON", outfile)
+    with open(outfile, 'w') as f:
+        json.dump(progress["json_list"], f, indent=2)
 
 
 def scrape_rankings(gamemode, country, max_page):
@@ -222,7 +169,7 @@ def exception_handler(request, exception):
 
 
 def download_rankings(api_key, outfile="rankings.json",
-                      progressfile="rankings_progress.pkl",
+                      progress_file="rankings_progress.pkl",
                       gamemode=0, country=None,
                       top_scores=100, start_rank=0, end_rank=10000):
     '''Download top (100) scores of top (10k) users.
@@ -233,12 +180,12 @@ def download_rankings(api_key, outfile="rankings.json",
     RANKS_PER_PAGE = 50
     BATCH_REQUESTS = 100
     BATCH_INTERVAL = 5  # seconds
-    PROGRESS_FREQ = 5  # How often to save progress
+    PROGRESS_FREQ = 10  # How often to save progress
 
 
-    if os.path.exists(progressfile):
-        print("Found progress file", progressfile)
-        with open(progressfile, 'rb') as f:
+    if os.path.exists(progress_file):
+        print("Found progress file", progress_file)
+        with open(progress_file, 'rb') as f:
             progress = pickle.load(f)
             start_rank = progress["start_rank"]
             print("Loaded start rank", start_rank)
@@ -275,8 +222,8 @@ def download_rankings(api_key, outfile="rankings.json",
 
         if progress_counter > 0 and progress_counter % PROGRESS_FREQ == 0:
             # Save progress
-            print("Saving progress to", progressfile)
-            with open(progressfile, 'wb') as f:
+            print("Saving progress to", progress_file)
+            with open(progress_file, 'wb') as f:
                 pickle.dump(progress, f)
 
         progress_counter += 1
@@ -296,7 +243,7 @@ def main():
     api_path = "api.key"
     API_KEY = open(api_path).read().strip()
 
-    download_rankings(api_key=API_KEY, gamemode=3, start_rank=0, end_rank=10000)
+    download_map_info(api_key=API_KEY, scrape=False)
 
 
 
