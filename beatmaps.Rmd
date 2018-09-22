@@ -3,7 +3,6 @@ title: "osu! Beatmap Stats"
 output: 
   html_document:
     toc:  true
-    toc_float:  true
 ---
 
 # Introduction
@@ -21,6 +20,7 @@ library(plyr)
 library(jsonlite)
 library(varhandle)
 library(chron)
+library(magrittr)
 ```
 
 ```{r, cache=TRUE}
@@ -146,20 +146,27 @@ ggplot(beatmaps, aes(x=month, group=mode, color=mode)) +
 # Tables
 
 ```{r}
+library(knitr)
+most.frequent.kable <- function(arr, lab) {
+  # Neat use of pipe
+  arr %>% table %>% sort(decreasing=TRUE) %>% head(20) %>% kable(col.names=c(lab, "Freq"))
+}
 # Most frequent artists, titles, sources, and creators
-head(sort(table(beatmaps$artist), decreasing=TRUE), 10)
-head(sort(table(beatmaps$title), decreasing=TRUE), 10)
-head(sort(table(beatmaps$source), decreasing=TRUE), 10)
-head(sort(table(beatmaps$creator), decreasing=TRUE), 10)
+beatmaps$artist  %>% most.frequent.kable("Artist")
+beatmaps$title   %>% most.frequent.kable("Title")
+beatmaps$source  %>% most.frequent.kable("Source")
+beatmaps$creator %>% most.frequent.kable("Creator")
 
-# Most favorited mapsets (mapset defined by creator, artist, and title)
-mapsets <- beatmaps[!duplicated(beatmaps[c("creator","artist","title")]),]
-most_fav <- head(arrange(mapsets, desc(favourite_count)), 20)
-subset(most_fav, select=c("favourite_count","creator","title"))
+# Most favorited mapsets
+beatmaps %>% 
+  subset(!duplicated(beatmaps$beatmapset_id)) %>%  # Keep rows with unique beatmapset_id
+  arrange(desc(favourite_count)) %>% 
+  head(50) %>% `[`(c("creator", "artist", "title", "favourite_count")) %>% kable
 
 # Most played maps
-most_played <- head(arrange(beatmaps, desc(playcount)), 20)
-subset(most_played, select=c("playcount","creator","title","version"))
+beatmaps %>%
+  arrange(desc(playcount)) %>% 
+  head(50) %>% `[`(c("creator", "artist", "title", "version", "playcount")) %>% kable
 ```
 
 # Scatterplots
