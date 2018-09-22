@@ -57,10 +57,6 @@ for (i in 1:4) {
 
 # Various plot parameters for convenience
 # These will usually leave a few outlier maps out
-diff_x_scale        <- scale_x_continuous(limits=c(0,10), breaks=seq(0,10,0.5))
-diff_hist           <- geom_histogram(binwidth=0.05)
-length_x_scale      <- scale_x_continuous(limits=c(0,600), breaks=seq(0,600,30))
-length_hist         <- geom_histogram(binwidth=1)
 AR_y_scale          <- scale_y_continuous(breaks=seq(0,10))
 SR_y_scale          <- scale_y_continuous(limits=c(0,10), breaks=seq(0,10,1))
 approved_x_scale    <- scale_x_datetime(date_breaks="1 year", date_labels="%Y")
@@ -74,7 +70,12 @@ theme_update(plot.title = element_text(hjust = 0.5))
 
 # Plots
 
+## Star Rating
+
 ```{r}
+diff_x_scale <- scale_x_continuous(limits=c(0,10), breaks=seq(0,10,0.5))
+diff_hist <- geom_histogram(binwidth=0.05)
+
 # Histogram of star rating (all modes)
 ggplot(beatmaps, aes(difficultyrating, fill=as.factor(mode))) + 
   ggtitle("Total Star Rating (All Modes)") + legend_title_fill +
@@ -85,20 +86,29 @@ ggplot(beatmaps, aes(difficultyrating, color=as.factor(mode))) +
   ggtitle("Star Rating (All Modes)") + legend_title_color +
   diff_x_scale + geom_freqpoly(binwidth=0.05) 
 
-# Histograms of SR (all modes) by faceting
-ggplot(beatmaps, aes(difficultyrating)) + 
-  diff_x_scale + diff_hist +
-  facet_wrap("mode") + 
-  labs(title = "Star Rating Distributions (All Modes)")
-
 # Histograms of SR (all modes) with separate y scales
-diffplots0 <- ggplot(std  , aes(difficultyrating)) + diff_x_scale + diff_hist + ggtitle("Standard")
-diffplots1 <- ggplot(taiko, aes(difficultyrating)) + diff_x_scale + diff_hist + ggtitle("Taiko")
-diffplots2 <- ggplot(ctb  , aes(difficultyrating)) + diff_x_scale + diff_hist + ggtitle("CtB")
-diffplots3 <- ggplot(mania, aes(difficultyrating)) + diff_x_scale + diff_hist + ggtitle("Mania")
+diffplots <- llply(1:4, function(m) {
+  ggplot(beatmaps[as.numeric(beatmaps$mode) == m, ], aes(difficultyrating)) +
+    diff_x_scale + diff_hist + 
+    ggtitle(gamemode.labels[m])
+})
+grid.arrange(grobs = diffplots, top="Star Rating Distributions (All Modes)")
+```
 
-grid.arrange(diffplots0, diffplots1, diffplots2, diffplots3, 
-             top="Star Rating Distributions (All Modes)")
+The ranking criteria until recently required non-marathon maps to have a difficulty Normal or below. 
+According to the new criteria, any map with less than 3:30 drain time requires a Normal or below. 
+This explains the large quantity of maps between 1\* and 2\*. 
+
+After these Easy and Normal maps, the most popular standard maps are between 3\* and 4\*. There is a small but noticeable spike in standard maps at about 5.25\*.
+
+Taiko stands out for having the most unimodal-looking distribution. 
+
+## Total Length
+
+```{r}
+length_x_scale <- scale_x_continuous(limits=c(0,600), breaks=seq(0,600,30))
+length_hist <- geom_histogram(binwidth=1)
+x_labels_90 <- theme(axis.text.x = element_text(angle=90, hjust=1))
 
 # Histogram of total length (all modes)
 ggplot(beatmaps, aes(total_length, fill=as.factor(mode))) + 
@@ -111,39 +121,53 @@ ggplot(beatmaps, aes(total_length, color=as.factor(mode))) +
   length_x_scale + geom_freqpoly(binwidth=1)
 
 # Histograms of total length (all modes)
-lengthplots0 <- ggplot(std  , aes(total_length)) + length_x_scale + length_hist + ggtitle("Standard")
-lengthplots1 <- ggplot(taiko, aes(total_length)) + length_x_scale + length_hist + ggtitle("Taiko")
-lengthplots2 <- ggplot(ctb  , aes(total_length)) + length_x_scale + length_hist + ggtitle("CtB")
-lengthplots3 <- ggplot(mania, aes(total_length)) + length_x_scale + length_hist + ggtitle("Mania")
+lengthplots <- llply(1:4, function(m) {
+  ggplot(beatmaps[as.numeric(beatmaps$mode) == m, ], aes(total_length)) +
+    length_hist + length_x_scale + x_labels_90 + 
+    ggtitle(gamemode.labels[m])
+})
 
-grid.arrange(lengthplots0, lengthplots1, lengthplots2, lengthplots3,
-             top="Beatmap Length Distributions (All Modes)")
+grid.arrange(grobs=lengthplots, top="Beatmap Length Distributions (All Modes)")
+```
 
+The massive spike in maps 85-90 seconds long corresponds to the ever-popular TV Size map genre.
+
+This occurs in every gamemode, though mania and taiko have relatively large numbers of two minute maps. 
+
+## Playcount
+
+```{r}
 # Frequency polygons of playcount (all modes)
 ggplot(beatmaps, aes(playcount, color=as.factor(mode))) + 
   ggtitle("Playcount (All Modes)") + legend_title_color +
   scale_x_continuous(limits=c(0,1000000)) + 
   geom_freqpoly(binwidth=5000)
+```
 
+## Date approved
+
+```{r}
 beatmaps$month <- cut(beatmaps$approved_date, breaks="month")
 year_x_scale <- scale_x_discrete(breaks=unique(cut(beatmaps$approved_date, breaks="year"))) 
-rotate_x_labels <- theme(axis.text.x = element_text(angle = 45, hjust = 1))
+x_labels_45 <- theme(axis.text.x = element_text(angle=45, hjust=1))
 
-# Histogram of date approved (all modes)
+# Bar chart of date approved (all modes)
 ggplot(beatmaps, aes(x=month, fill=mode)) + 
   ggtitle("Date Approved (All Modes)") +
-  geom_histogram(stat="count", width=1) + 
-  year_x_scale + rotate_x_labels
+  geom_bar(width=1) + 
+  year_x_scale + x_labels_45
 
 # Frequency polygon of date approved (all modes)
 ggplot(beatmaps, aes(x=month, group=mode, color=mode)) +
   ggtitle("Date Approved (All Modes)") + 
   legend_title_color +
   geom_freqpoly(stat="count") +
-  year_x_scale + rotate_x_labels
+  year_x_scale + x_labels_45
 ```
 
 # Tables
+
+## Most frequent artists, titles, sources, and creators
 
 ```{r}
 library(knitr)
@@ -151,19 +175,24 @@ most.frequent.kable <- function(arr, lab) {
   # Neat use of pipe
   arr %>% table %>% sort(decreasing=TRUE) %>% head(20) %>% kable(col.names=c(lab, "Freq"))
 }
-# Most frequent artists, titles, sources, and creators
+
 beatmaps$artist  %>% most.frequent.kable("Artist")
 beatmaps$title   %>% most.frequent.kable("Title")
 beatmaps$source  %>% most.frequent.kable("Source")
 beatmaps$creator %>% most.frequent.kable("Creator")
+```
 
-# Most favorited mapsets
+## Most favorited mapsets
+```{r}
 beatmaps %>% 
   subset(!duplicated(beatmaps$beatmapset_id)) %>%  # Keep rows with unique beatmapset_id
   arrange(desc(favourite_count)) %>% 
   head(50) %>% `[`(c("creator", "artist", "title", "favourite_count")) %>% kable
+```
 
-# Most played maps
+
+## Most played maps
+```{r}
 beatmaps %>%
   arrange(desc(playcount)) %>% 
   head(50) %>% `[`(c("creator", "artist", "title", "version", "playcount")) %>% kable
@@ -230,12 +259,13 @@ ggplot(std, aes(approved_date, difficultyrating)) +
 ```{r}
 # Playcount by song time, categorized by spread icon
 # https://osu.ppy.sh/help/wiki/Difficulties#star-rating Not sure about values between boundaries
+
 spread.sr = c(0, 1.51, 2.26, 3.76, 5.26, 6.76)  
 spread.names = c("Easy", "Normal", "Hard", "Insane", "Expert", "Expert+")
 spread.colors = c("olivedrab3", "paleturquoise", "gold", "hotpink", "purple", "darkgray")
 
 # Assign difficulty rating by spread ranges to spread names 
-beatmaps$spread_name = spread.names[cut(beatmaps$difficultyrating, spread.sr, right=FALSE, labels=FALSE)]
+beatmaps$spread_name <- spread.names[cut(beatmaps$difficultyrating, spread.sr, right=FALSE, labels=FALSE)]
 std <- beatmaps[beatmaps$mode == "Standard",]  # update std 
 
 hitlength.bins = seq(0, 360, 30)
