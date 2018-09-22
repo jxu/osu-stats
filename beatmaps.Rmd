@@ -44,8 +44,6 @@ write.csv(beatmaps, "beatmaps.csv", row.names=FALSE)
 ```
 
 ```{r}
-
-
 # Convert MySQL datetimes to R datetimes. As far as the new site goes, this appears to be UTC-4, but
 # this may be a local thing. Probably broken. 
 beatmaps$approved_date <- as.POSIXct(beatmaps$approved_date, tz="Etc/GMT+4")
@@ -147,7 +145,14 @@ ggplot(beatmaps, aes(playcount, color=as.factor(mode))) +
   ggtitle("Playcount (All Modes)") + legend_title_color +
   scale_x_continuous(limits=c(0,1000000)) + 
   geom_freqpoly(binwidth=5000)
+
+# Log playcount
+ggplot(beatmaps, aes(log10(playcount), color=as.factor(mode))) + 
+  ggtitle("Playcount (All Modes)") + legend_title_color +
+  geom_freqpoly(binwidth=0.1)
 ```
+
+Interestingly, playcount seems to be log-normally distributed.
 
 ## Date approved
 
