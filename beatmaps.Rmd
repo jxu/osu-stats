@@ -24,12 +24,10 @@ library(magrittr)
 ```
 
 ```{r, cache=TRUE}
-# Cached chunk
+# Cached chunk (run once)
 # Import data from JSON and remove duplicate rows
 beatmaps <- unique(do.call("rbind", fromJSON("maps.json")))
-```
 
-```{r}
 # Set global figure width and height
 knitr::opts_chunk$set(fig.width=10, fig.height=6) 
 # Disable warnings and messages
@@ -40,6 +38,13 @@ beatmaps.isintcol <- sapply(beatmaps, function(col) all(check.numeric(col, only.
 beatmaps.isnumcol <- sapply(beatmaps, function(col) all(check.numeric(col))) & !beatmaps.isintcol
 beatmaps[, beatmaps.isintcol] = sapply(beatmaps[, beatmaps.isintcol], as.integer)
 beatmaps[, beatmaps.isnumcol] = sapply(beatmaps[, beatmaps.isnumcol], as.numeric)
+
+# Write beatmap data as CSV
+write.csv(beatmaps, "beatmaps.csv", row.names=FALSE)
+```
+
+```{r}
+
 
 # Convert MySQL datetimes to R datetimes. As far as the new site goes, this appears to be UTC-4, but
 # this may be a local thing. Probably broken. 
