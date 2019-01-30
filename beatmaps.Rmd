@@ -49,14 +49,17 @@ write.csv(beatmaps, "beatmaps.csv", row.names=FALSE)
 beatmaps$approved_date <- as.POSIXct(beatmaps$approved_date, tz="Etc/GMT+4")
 beatmaps$last_update <- as.POSIXct(beatmaps$last_update, tz="Etc/GMT+4")
 
+# Assign difficulty rating by spread ranges to spread names 
+beatmaps$spread_name <- spread.names[cut(beatmaps$difficultyrating, spread.sr, right=FALSE, labels=FALSE)]
+
+beatmaps$month <- cut(beatmaps$approved_date, breaks="month")
 
 # Create labels and data frames for each gamemode
 gamemodes <- c("std", "taiko", "ctb", "mania")
 gamemode.labels <- c("Standard", "Taiko", "CtB", "Mania")
 beatmaps$mode <- factor(beatmaps$mode, labels=gamemode.labels)
-for (i in 1:4) {
-  assign(gamemodes[i], beatmaps[beatmaps$mode == gamemode.labels[i],])
-}
+
+std <- beatmaps[beatmaps$mode == "Standard",]  # update std 
 
 # Various plot parameters for convenience
 # These will usually leave a few outlier maps out
@@ -157,7 +160,6 @@ Interestingly, playcount seems to be log-normally distributed.
 ## Date approved
 
 ```{r}
-beatmaps$month <- cut(beatmaps$approved_date, breaks="month")
 year_x_scale <- scale_x_discrete(breaks=unique(cut(beatmaps$approved_date, breaks="year"))) 
 x_labels_45 <- theme(axis.text.x = element_text(angle=45, hjust=1))
 
@@ -213,24 +215,24 @@ beatmaps %>%
 ```{r}
 # Scatterplot of AR vs BPM
 ggplot(std, aes(bpm, diff_approach)) + 
-  ggtitle("Approach Rate vs BPM") + 
+  geom_point(alpha=0.1) +
   scale_x_continuous(limits=c(0,500)) + 
-  AR_y_scale + 
-  geom_point(alpha=0.1)
-
+  AR_y_scale +
+  ggtitle("Approach Rate vs BPM") 
+  
 # Scatterplot of SR vs total length time
 ggplot(std, aes(total_length, difficultyrating)) + 
-  ggtitle("Star Rating vs Total Length") +
+  geom_point(alpha=0.1) +
   length_x_scale + 
   SR_y_scale +
-  geom_point(alpha=0.1)
+  ggtitle("Star Rating vs Total Length") 
 
 # Scatterplot of max combo vs drain time
 ggplot(std, aes(hit_length, max_combo)) + 
-  ggtitle("Max Combo vs Drain Time") + 
+  geom_point(alpha=0.05) +
   length_x_scale + 
   scale_y_continuous(limits=c(0,4000)) +
-  geom_point(alpha=0.05)
+  ggtitle("Max Combo vs Drain Time") 
 
 # High linear correlation, as expected
 summary(lm(max_combo ~ hit_length, data=std))
@@ -274,9 +276,7 @@ spread.sr = c(0, 1.51, 2.26, 3.76, 5.26, 6.76)
 spread.names = c("Easy", "Normal", "Hard", "Insane", "Expert", "Expert+")
 spread.colors = c("olivedrab3", "paleturquoise", "gold", "hotpink", "purple", "darkgray")
 
-# Assign difficulty rating by spread ranges to spread names 
-beatmaps$spread_name <- spread.names[cut(beatmaps$difficultyrating, spread.sr, right=FALSE, labels=FALSE)]
-std <- beatmaps[beatmaps$mode == "Standard",]  # update std 
+
 
 hitlength.bins = seq(0, 360, 30)
 par(mfrow=c(2,3), mar=c(4,4,4,1), cex.main=2)
