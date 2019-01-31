@@ -14,13 +14,20 @@ import itertools
 
 
 class Progress:
-    '''Organize seen information to be saved and reloaded.
+    '''Organize seen information used in the process of making many API calls
+    to be saved and reloaded.
 
-    json_list: list of info to be JSON dumped
+    Attributes:
+        json_list: list of info to be JSON dumped
     '''
 
     def __init__(self):
         self.json_list = []
+
+    @staticmethod
+    def load(progress_file):
+        with open(progress_file, 'rb') as f:
+            return pickle.load(f)
 
     def save(self, progress_file):
         with open(progress_file, 'wb') as f:
@@ -35,6 +42,7 @@ def scrape_map_pages(set_ids):
     """Scrape pages given by set_ids with a fixed order and returns dict
     with (set_id: submitted_date) pairs.
     Makes requests asynchronously with grequests.
+
     https://github.com/ppy/osu-api/issues/195
     old.ppy.sh may be faster but gives less time info about dates.
     """
@@ -78,8 +86,7 @@ def download_map_info(api_key,
     # Load or init progress structures
     if use_progress and os.path.exists(progress_file):
         print("Loading progress file", progress_file)
-        with open(progress_file, 'rb') as f:
-            progress = pickle.load(f)
+        progress = Progress.load(progress_file)
 
         since_date_str = progress.since  # Load since date
         print("Loaded since date", since_date_str)
@@ -162,16 +169,16 @@ def download_map_info(api_key,
     progress.final_write(outfile)
 
 
-def scrape_rankings(gamemode, country, max_page):
-    '''Scrape a rankings page for user IDs.
-    https://github.com/ppy/osu-api/issues/132 '''
+def scrape_rankings(gamemode, country=None, min_page=1, max_page=200):
+    '''Scrape rankings pages (one request at a time) for user IDs.
+    https://github.com/ppy/osu-api/issues/132
+    '''
     RANKINGS_URL = "https://old.ppy.sh/p/pp"
-
     user_ids = []
 
     session = requests.Session()
 
-    for page in range(1, max_page+1):
+    for page in range(min_page, max_page+1):
         print("Scraping rankings page", page)
         payload = {'m': gamemode, "page": page}
         if country:
@@ -179,7 +186,7 @@ def scrape_rankings(gamemode, country, max_page):
 
         r = session.get(RANKINGS_URL, params=payload)
 
-
+        # Parse user_id
         soup = BeautifulSoup(r.text, "html.parser")
         for href_tag in soup.find_all(href=True):
             link = href_tag['href']
@@ -199,8 +206,9 @@ def download_rankings(api_key, outfile="rankings.json",
                       progress_file="rankings_progress.pkl",
                       gamemode=0, country=None,
                       top_scores=100, start_rank=0, end_rank=10000):
-    '''Download top (100) scores of top (10k) users.
+    '''WIP Download top (100) scores of top (10k) users.
      Due to API rate limit, progress is stored.
+     TODO: needs more testing.
      TODO: writing to progress file is slow so avoid doing too often.
      '''
     API_URL = "https://osu.ppy.sh/api/get_user_best"
