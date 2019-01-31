@@ -14,19 +14,18 @@ Only uses ranked/loved/qualified maps. Graphs focusing on standard mode.
 (A few maps, due to ranked/loved irregularities, are actually in graveyard but included in the API query anyway. Ex. https://osu.ppy.sh/b/766190&m=2 with 1 loved CtB diff. )
 
 ```{r}
-library(ggplot2)
+library(tidyverse)
 library(gridExtra)
 library(plyr)
 library(jsonlite)
 library(varhandle)
 library(chron)
-library(magrittr)
 ```
 
 ```{r, cache=TRUE}
 # Cached chunk (run once)
 # Import data from JSON and remove duplicate rows
-beatmaps <- unique(do.call("rbind", fromJSON("maps.json")))
+beatmaps <- unique(fromJSON("maps.json"))
 
 # Set global figure width and height
 knitr::opts_chunk$set(fig.width=10, fig.height=6) 
@@ -34,10 +33,11 @@ knitr::opts_chunk$set(fig.width=10, fig.height=6)
 knitr::opts_chunk$set(message = FALSE, warning = FALSE)
 
 # Convert strings of ints and floats to numeric datatypes
+# (The API returns numbers as strings, issue #236)
 beatmaps.isintcol <- sapply(beatmaps, function(col) all(check.numeric(col, only.integer=TRUE))) 
 beatmaps.isnumcol <- sapply(beatmaps, function(col) all(check.numeric(col))) & !beatmaps.isintcol
-beatmaps[, beatmaps.isintcol] = sapply(beatmaps[, beatmaps.isintcol], as.integer)
-beatmaps[, beatmaps.isnumcol] = sapply(beatmaps[, beatmaps.isnumcol], as.numeric)
+beatmaps[, beatmaps.isintcol] <- sapply(beatmaps[, beatmaps.isintcol], as.integer)
+beatmaps[, beatmaps.isnumcol] <- sapply(beatmaps[, beatmaps.isnumcol], as.numeric)
 
 # Write beatmap data as CSV
 write.csv(beatmaps, "beatmaps.csv", row.names=FALSE)
@@ -50,7 +50,7 @@ beatmaps$approved_date <- as.POSIXct(beatmaps$approved_date, tz="Etc/GMT+4")
 beatmaps$last_update <- as.POSIXct(beatmaps$last_update, tz="Etc/GMT+4")
 
 # Assign difficulty rating by spread ranges to spread names 
-beatmaps$spread_name <- spread.names[cut(beatmaps$difficultyrating, spread.sr, right=FALSE, labels=FALSE)]
+beatmaps$spread_name <- spread.names[cut(beatmaps$difficultyrating, right=FALSE, labels=FALSE)]
 
 beatmaps$month <- cut(beatmaps$approved_date, breaks="month")
 
