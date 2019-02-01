@@ -8,8 +8,7 @@ from bs4 import BeautifulSoup
 import json
 import time
 import math
-
-# TODO: Rewrite progress dicts as class for download functions
+import argparse
 
 
 class Progress:
@@ -35,6 +34,7 @@ class Progress:
             pickle.dump(self, f)
 
     def final_write(self, outfile):
+        # Currently, per API, all values in JSON are strings
         print("Final write to", outfile)
         with open(outfile, 'w') as f:
             json.dump(self.json_list, f, indent=2)
@@ -79,6 +79,7 @@ def download_map_info(api_key,
     If progress_file exists, tries to restart based on seen file (pickle)
     WARNING: Scraping is probably slow!
     Resume functionality appears stable, but no warranty(TM)
+    TODO: add gamemode
     """
 
     API_URL = "https://osu.ppy.sh/api/get_beatmaps"
@@ -257,7 +258,8 @@ def download_rankings(api_key,
 
         # Store downloaded JSON
         for r in grequests.map(rs, exception_handler=exception_handler):
-            progress.json_list.extend(r.json())
+            json_response = r.json()
+            progress.json_list.extend(json_response)
 
         # Save progress every PROGRESS_FREQ iters
         if progress_counter % PROGRESS_FREQ == 0:
@@ -267,7 +269,9 @@ def download_rankings(api_key,
 
         # Don't exceed 1200 requests/min and make peppy angry
         # Dumb throttling
-        time.sleep(max(0, start_time + BATCH_INTERVAL - time.process_time()))
+        wait_time = max(0, start_time + BATCH_INTERVAL - time.process_time())
+        print("Waiting", wait_time, "s")
+        time.sleep(wait_time)
 
 
     # Final write
@@ -275,11 +279,47 @@ def download_rankings(api_key,
 
 
 def main():
-    api_path = "api.key"
-    API_KEY = open(api_path).read().strip()
+    parser = argparse.ArgumentParser(description="osu! bulk API downloader")
 
-    #download_map_info(api_key=API_KEY, scrape=False)
-    download_rankings(API_KEY, gamemode=3)
+    parser.add_argument("command", help="One of: map-info, rankings")
+    parser.add_argument("-o", dest="outfile", help="JSON file to write to")
+    parser.add_argument("-p", dest="progress_file",
+                        help="File to store downloading progress")
+    parser.add_argument("-k", dest="keyfile", default="api.key",
+                        help="File to read API key. Defaults to api.key")
+    parser.add_argument("-m", dest="gamemode", type=int,
+                        help="Game mode " +
+                             "(0 = osu!, 1 = Taiko, 2 = CtB, 3 = osu!mania)\n"+
+                             "Defaults to all gamemodes")
+    parser.add_argument("-s", dest="scrape", default=False,
+                        help="Turn on expensive scraping (probably broken)")
+
+    args = parser.parse_args()
+
+    API_KEY = open(args.keyfile).read().strip()
+
+    if args.command == "map_info":
+        # Default filenames
+        if not args.outfile: args.outfile = "maps.json"
+        if not args.progress_file: args.progress_file = "maps_progress.pkl"
+        print(args)
+
+        download_map_info(API_KEY, outfile=args.outfile, scrape=args.scrape,
+                          progress_file=args.progress_file)
+
+    elif args.command == "rankings":
+        # Default filenames
+        if not args.outfile: args.outfile = "rankings.json"
+        if not args.progress_file: args.progress_file = "rankings_progress.pkl"
+        print(args)
+
+        assert isinstance(args.gamemode, int), "gamemode required"
+
+        download_rankings(API_KEY, outfile=args.outfile, gamemode=args.gamemode,
+                          progress_file=args.progress_file)
+
+    else:
+        raise ValueError("Bad command")
 
 
 
