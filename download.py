@@ -1,5 +1,3 @@
-import gevent.monkey; gevent.monkey.patch_all()
-import requests
 import datetime
 import os.path
 import pickle
@@ -9,7 +7,7 @@ import json
 import time
 import math
 import argparse
-
+import requests
 
 class Progress:
     '''Organize seen information used in the process of making many API calls
@@ -33,7 +31,7 @@ class Progress:
         with open(progress_file, 'wb') as f:
             pickle.dump(self, f)
 
-    def final_write(self, outfile):
+    def json_write(self, outfile):
         # Currently, per API, all values in JSON are strings
         print("Final write to", outfile)
         with open(outfile, 'w') as f:
@@ -68,11 +66,10 @@ def scrape_map_pages(set_ids):
 
 
 def download_map_info(api_key,
-                      outfile="maps.json",
+                      outfile,
+                      progress_file,
                       since_date_str="2007-10-07",
-                      progress_file="maps_progress.pkl",
-                      scrape=False,
-                      use_progress=True):
+                      scrape=False):
     """Main function to download and write data table from API (and scraping).
     Makes requests sequentially.
     Scraping mode adds what scrape_map_pages returns.
@@ -82,12 +79,17 @@ def download_map_info(api_key,
     TODO: add gamemode
     """
 
+    assert outfile is not None, "outfile required"
+
     API_URL = "https://osu.ppy.sh/api/get_beatmaps"
     API_MAX_RESULTS = 500
     MYSQL_TIMESTAMP_FMT = "%Y-%m-%d %H:%M:%S"
 
     # Load or init progress structures
-    if use_progress and os.path.exists(progress_file):
+    # maybe move this to Progress class
+    use_progress_file = (progress_file is not None)
+
+    if use_progress_file:
         print("Loading progress file", progress_file)
         progress = Progress.load(progress_file)
 
@@ -96,6 +98,7 @@ def download_map_info(api_key,
 
 
     else:
+        print("Creating new Progress instance")
         progress = Progress()
 
     session = requests.Session()
@@ -143,12 +146,13 @@ def download_map_info(api_key,
                     submitted_dates[info_dict["beatmapset_id"]]
 
 
-        # Write out progress
-        progress.since = since_date_str
-        print("Writing progress to", progress_file)
-        #print("Maps:", len(list(itertools.chain(*progress["json_list"]))))
-        print("Maps:", len(progress.json_list))
-        progress.save(progress_file)
+        if use_progress_file:
+            # Write out progress
+            progress.since = since_date_str
+            print("Writing progress to", progress_file)
+            #print("Maps:", len(list(itertools.chain(*progress["json_list"]))))
+            print("Maps:", len(progress.json_list))
+            progress.save(progress_file)
 
 
         # When the API returns 500 results, last mapset may have diffs cut off.
@@ -169,7 +173,7 @@ def download_map_info(api_key,
 
     # Final write
     print("Writing final JSON", outfile)
-    progress.final_write(outfile)
+    progress.json_write(outfile)
 
 
 def scrape_rankings(gamemode=0, country=None, min_page=1, max_page=200):
@@ -208,8 +212,10 @@ def exception_handler(request, exception):
 
 
 def download_rankings(api_key,
-                      outfile="rankings.json",
-                      progress_file="rankings_progress.pkl",
+                      outfile,
+                      progress_file,
+                      add_map_info=False,
+                      map_file=None,
                       gamemode=0,
                       country=None,
                       top_scores=100,
@@ -217,6 +223,8 @@ def download_rankings(api_key,
                       end_rank=10000):
     '''WIP Download top (100) scores of top (10k) users.
      Due to API rate limit, progress is stored.
+     If add_map_info is specified, read map_file and map info to player's
+     best scores
      TODO: needs more testing.
      '''
     API_URL = "https://osu.ppy.sh/api/get_user_best"
@@ -225,14 +233,14 @@ def download_rankings(api_key,
     BATCH_INTERVAL = 5   # seconds
     PROGRESS_FREQ  = 10  # How often to save progress
 
-
+    # Load progress if exists
     if os.path.exists(progress_file):
         progress = Progress.load(progress_file)
         start_rank = progress.start_rank
         print("Loaded start rank", start_rank)
         print("JSON list length", len(progress.json_list))
 
-
+    # Start new progress
     else:
         progress = Progress()
         assert 0 <= start_rank < end_rank <= 10000
@@ -275,7 +283,7 @@ def download_rankings(api_key,
 
 
     # Final write
-    progress.final_write(outfile)
+    progress.json_write(outfile)
 
 
 def main():
@@ -291,19 +299,15 @@ def main():
                         help="Game mode " +
                              "(0 = osu!, 1 = Taiko, 2 = CtB, 3 = osu!mania)\n"+
                              "Defaults to all gamemodes")
-    parser.add_argument("-s", dest="scrape", default=False,
-                        help="Turn on expensive scraping (probably broken)")
+    #parser.add_argument("-s", dest="scrape", default=False,
+    #                    help="Turn on expensive scraping (probably broken)")
 
     args = parser.parse_args()
+    print(args)
 
     API_KEY = open(args.keyfile).read().strip()
 
     if args.command == "map_info":
-        # Default filenames
-        if not args.outfile: args.outfile = "maps.json"
-        if not args.progress_file: args.progress_file = "maps_progress.pkl"
-        print(args)
-
         download_map_info(API_KEY, outfile=args.outfile, scrape=args.scrape,
                           progress_file=args.progress_file)
 
