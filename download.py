@@ -73,13 +73,17 @@ def download_map_info(api_key,
     """Main function to download and write data table from API (and scraping).
     Makes requests sequentially.
     Scraping mode adds what scrape_map_pages returns.
+
+    progress_file is always created.
     If progress_file exists, tries to restart based on seen file (pickle)
+
     WARNING: Scraping is probably slow!
     Resume functionality appears stable, but no warranty(TM)
     TODO: add gamemode
     """
 
     assert outfile is not None, "outfile required"
+    assert progress_file is not None, "progress_file required"
 
     API_URL = "https://osu.ppy.sh/api/get_beatmaps"
     API_MAX_RESULTS = 500
@@ -87,9 +91,8 @@ def download_map_info(api_key,
 
     # Load or init progress structures
     # maybe move this to Progress class
-    use_progress_file = (progress_file is not None)
 
-    if use_progress_file:
+    if os.path.isfile(progress_file):
         print("Loading progress file", progress_file)
         progress = Progress.load(progress_file)
 
@@ -146,13 +149,11 @@ def download_map_info(api_key,
                     submitted_dates[info_dict["beatmapset_id"]]
 
 
-        if use_progress_file:
-            # Write out progress
-            progress.since = since_date_str
-            print("Writing progress to", progress_file)
-            #print("Maps:", len(list(itertools.chain(*progress["json_list"]))))
-            print("Maps:", len(progress.json_list))
-            progress.save(progress_file)
+        # Write out progress
+        progress.since = since_date_str
+        print("Writing progress to", progress_file)
+        print("Maps:", len(progress.json_list))
+        progress.save(progress_file)
 
 
         # When the API returns 500 results, last mapset may have diffs cut off.
@@ -299,15 +300,15 @@ def main():
                         help="Game mode " +
                              "(0 = osu!, 1 = Taiko, 2 = CtB, 3 = osu!mania)\n"+
                              "Defaults to all gamemodes")
-    #parser.add_argument("-s", dest="scrape", default=False,
-    #                    help="Turn on expensive scraping (probably broken)")
+    parser.add_argument("-s", dest="scrape", default=False,
+                        help="Turn on expensive scraping (probably broken)")
 
     args = parser.parse_args()
     print(args)
 
     API_KEY = open(args.keyfile).read().strip()
 
-    if args.command == "map_info":
+    if args.command == "map-info":
         download_map_info(API_KEY, outfile=args.outfile, scrape=args.scrape,
                           progress_file=args.progress_file)
 
