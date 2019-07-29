@@ -38,46 +38,16 @@ class Progress:
             json.dump(self.json_list, f, indent=2)
 
 
-def scrape_map_pages(set_ids):
-    """Scrape pages given by set_ids with a fixed order and returns dict
-    with (set_id: submitted_date) pairs.
-    Makes requests asynchronously with grequests.
-
-    https://github.com/ppy/osu-api/issues/195
-    old.ppy.sh may be faster but gives less time info about dates.
-    """
-    API_URL = "http://osu.ppy.sh/beatmapsets/"
-
-    submitted_dates = dict()
-    urls = [API_URL + str(set_id) for set_id in set_ids]
-    rs = (grequests.get(u) for u in urls)
-    for r, set_id in zip(grequests.map(rs), set_ids):
-        assert r.status_code == 200  # set exists
-
-        soup = BeautifulSoup(r.text, "html.parser")
-        json_beatmapset = soup.find("script", id="json-beatmapset")
-        submitted_date = json.loads(json_beatmapset.string)["submitted_date"]
-        print(r.url, submitted_date)
-        submitted_dates[set_id] = submitted_date
-
-    assert len(submitted_dates) == len(set_ids)
-    return submitted_dates
-
-
-
 def download_map_info(api_key,
                       outfile,
                       progress_file,
-                      since_date_str="2007-10-07",
-                      scrape=False):
+                      since_date_str="2001-01-01"):
     """Main function to download and write data table from API (and scraping).
     Makes requests sequentially.
-    Scraping mode adds what scrape_map_pages returns.
 
     progress_file is always created.
     If progress_file exists, tries to restart based on seen file (pickle)
 
-    WARNING: Scraping is probably slow!
     Resume functionality appears stable, but no warranty(TM)
     TODO: add gamemode
     """
@@ -133,20 +103,6 @@ def download_map_info(api_key,
                   info_dict["artist"],
                   info_dict["title"],
                   info_dict["version"]))
-
-
-        if scrape:
-            set_ids = set()
-            # Gather set_ids in info_dicts to batch request
-            for info_dict in info_dicts:
-                set_ids.add(info_dict["beatmapset_id"])
-
-            submitted_dates = scrape_map_pages(set_ids)
-
-            # Add in key-value pair of info obtained from scraping
-            for info_dict in info_dicts:
-                info_dict["submitted_date"] = \
-                    submitted_dates[info_dict["beatmapset_id"]]
 
 
         # Write out progress
@@ -290,6 +246,7 @@ def download_rankings(api_key,
 def main():
     parser = argparse.ArgumentParser(description="osu! bulk API downloader")
 
+    # TODO: add since date str
     parser.add_argument("command", help="One of: map-info, rankings")
     parser.add_argument("-o", dest="outfile", help="JSON file to write to")
     parser.add_argument("-p", dest="progress_file",
@@ -300,8 +257,7 @@ def main():
                         help="Game mode " +
                              "(0 = osu!, 1 = Taiko, 2 = CtB, 3 = osu!mania)\n"+
                              "Defaults to all gamemodes")
-    parser.add_argument("-s", dest="scrape", default=False,
-                        help="Turn on expensive scraping (probably broken)")
+
 
     args = parser.parse_args()
     print(args)
@@ -309,23 +265,22 @@ def main():
     API_KEY = open(args.keyfile).read().strip()
 
     if args.command == "map-info":
-        download_map_info(API_KEY, outfile=args.outfile, scrape=args.scrape,
+        download_map_info(API_KEY,
+                          outfile=args.outfile,
                           progress_file=args.progress_file)
 
     elif args.command == "rankings":
         # Default filenames
-        if not args.outfile: args.outfile = "rankings.json"
-        if not args.progress_file: args.progress_file = "rankings_progress.pkl"
-        print(args)
 
         assert isinstance(args.gamemode, int), "gamemode required"
 
-        download_rankings(API_KEY, outfile=args.outfile, gamemode=args.gamemode,
+        download_rankings(API_KEY,
+                          outfile=args.outfile,
+                          gamemode=args.gamemode,
                           progress_file=args.progress_file)
 
     else:
         raise ValueError("Bad command")
-
 
 
 if __name__ == "__main__":
