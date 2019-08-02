@@ -105,6 +105,7 @@ def download_map_info(api_key,
 
 
         # Write out progress
+        # TODO: save less often
         progress.since = since_date_str
         print("Writing progress to", progress_file)
         print("Maps:", len(progress.json_list))
@@ -177,6 +178,8 @@ def download_rankings(api_key,
     '''WIP Download top (100) scores of top (10k) users.
      Due to API rate limit, progress is stored.
      TODO: needs more testing.
+     TODO: move batch API calling routine to own function.
+     That way program can just scrape top users and not dl scores.
      '''
     API_URL = "https://osu.ppy.sh/api/get_user_best"
     BATCH_REQUESTS = 100
@@ -200,6 +203,8 @@ def download_rankings(api_key,
             scrape_rankings(gamemode=gamemode, country=country,
                             max_page=max_page)
 
+        progress.save(progress_file)
+
 
     progress_counter = 0
     for i in range(start_rank, end_rank, BATCH_REQUESTS):
@@ -221,7 +226,7 @@ def download_rankings(api_key,
             progress.json_list.extend(json_response)
 
         # Save progress every PROGRESS_FREQ iters
-        if progress_counter % PROGRESS_FREQ == 0:
+        if progress_counter % PROGRESS_FREQ == 0 and progress_counter > 0:
             progress.save(progress_file)
 
         progress_counter += 1
