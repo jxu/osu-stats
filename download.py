@@ -61,7 +61,6 @@ def download_map_info(api_key,
 
     # Load or init progress structures
     # maybe move this to Progress class
-
     if os.path.isfile(progress_file):
         print("Loading progress file", progress_file)
         progress = Progress.load(progress_file)
@@ -116,7 +115,6 @@ def download_map_info(api_key,
         # Therefore, the whole mapset needs to be read again. The API's "since"
         # parameter appears to be exclusive, so subtract 1 second to include
         # the map again.
-
         end_date_str = info_dicts[-1]["approved_date"]
         end_date = datetime.datetime.strptime(
             end_date_str, MYSQL_TIMESTAMP_FMT)
@@ -135,7 +133,7 @@ def download_map_info(api_key,
 
 def scrape_rankings(gamemode=0, country=None, min_page=1, max_page=200):
     '''Scrape rankings pages (one request at a time) for user IDs.
-    https://github.com/ppy/osu-api/issues/132
+    https://github.com/ppy/osu-api/issues/102
     '''
     RANKINGS_URL = "https://old.ppy.sh/p/pp"
     user_ids = []
@@ -171,8 +169,6 @@ def exception_handler(request, exception):
 def download_rankings(api_key,
                       outfile,
                       progress_file,
-                      add_map_info=False,
-                      map_file=None,
                       gamemode=0,
                       country=None,
                       top_scores=100,
@@ -180,18 +176,15 @@ def download_rankings(api_key,
                       end_rank=10000):
     '''WIP Download top (100) scores of top (10k) users.
      Due to API rate limit, progress is stored.
-     If add_map_info is specified, read map_file and map info to player's
-     best scores
      TODO: needs more testing.
      '''
     API_URL = "https://osu.ppy.sh/api/get_user_best"
-    RANKS_PER_PAGE = 50
     BATCH_REQUESTS = 100
     BATCH_INTERVAL = 5   # seconds
     PROGRESS_FREQ  = 10  # How often to save progress
 
     # Load progress if exists
-    if os.path.exists(progress_file):
+    if os.path.isfile(progress_file):
         progress = Progress.load(progress_file)
         start_rank = progress.start_rank
         print("Loaded start rank", start_rank)
@@ -201,7 +194,7 @@ def download_rankings(api_key,
     else:
         progress = Progress()
         assert 0 <= start_rank < end_rank <= 10000
-
+        RANKS_PER_PAGE = 50
         max_page = math.ceil(end_rank / RANKS_PER_PAGE)
         progress.user_ids = \
             scrape_rankings(gamemode=gamemode, country=country,
@@ -210,6 +203,7 @@ def download_rankings(api_key,
 
     progress_counter = 0
     for i in range(start_rank, end_rank, BATCH_REQUESTS):
+        # Could move API calling to own function
         progress.start_rank = i  # Save start rank
         rs = []
         user_ids_range = progress.user_ids[i:i+BATCH_REQUESTS]
@@ -235,7 +229,7 @@ def download_rankings(api_key,
         # Don't exceed 1200 requests/min and make peppy angry
         # Dumb throttling
         wait_time = max(0, start_time + BATCH_INTERVAL - time.process_time())
-        print("Waiting", wait_time, "s")
+        print("Waiting", round(wait_time, 2), "s")
         time.sleep(wait_time)
 
 
@@ -248,7 +242,7 @@ def main():
 
     # TODO: add since date str
     parser.add_argument("command", help="One of: map-info, rankings")
-    parser.add_argument("-o", dest="outfile", help="JSON file to write to")
+    parser.add_argument("outfile", help="JSON file to write to")
     parser.add_argument("-p", dest="progress_file",
                         help="File to store downloading progress")
     parser.add_argument("-k", dest="keyfile", default="api.key",
@@ -264,15 +258,18 @@ def main():
 
     API_KEY = open(args.keyfile).read().strip()
 
+    # for now, require progress file
+    assert args.progress_file is not None, "progress file required"
+
     if args.command == "map-info":
         download_map_info(API_KEY,
                           outfile=args.outfile,
                           progress_file=args.progress_file)
 
     elif args.command == "rankings":
-        # Default filenames
-
-        assert isinstance(args.gamemode, int), "gamemode required"
+        # treat blank gamemode as 0
+        if args.gamemode is not None:
+            args.gamemode = 0
 
         download_rankings(API_KEY,
                           outfile=args.outfile,
