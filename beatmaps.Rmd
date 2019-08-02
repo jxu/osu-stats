@@ -11,36 +11,33 @@ Basic data visualization of beatmap info provided by osu! API. https://github.co
 
 Only uses ranked/loved/qualified maps. Graphs focusing on standard mode. 
 
-(A few maps, due to ranked/loved irregularities, are actually in graveyard but included in the API query anyway. Ex. https://osu.ppy.sh/b/766190&m=2 with 1 loved CtB diff. )
+(A few maps, due to ranked/loved irregularities, are actually in graveyard but included in the API query anyway. Ex. https://osu.ppy.sh/b/766190&m=2 with 1 loved CtB diff.)
 
 ```{r}
 library(tidyverse)
 library(gridExtra)
-library(plyr)
 library(jsonlite)
 library(varhandle)
 library(chron)
+library(plyr)
 ```
 
-```{r, cache=TRUE}
-# Cached chunk (run once)
-# Import data from JSON and remove duplicate rows
-beatmaps <- unique(fromJSON("maps.json"))
-
+```{r setup, include=FALSE}
 # Set global figure width and height
 knitr::opts_chunk$set(fig.width=10, fig.height=6) 
-# Disable warnings and messages
-knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+
+```{r, cache=TRUE}
+# Cached chunk: Import data from JSON and remove duplicate rows
+beatmaps <- unique(fromJSON("maps.json"))
 
 # Convert strings of ints and floats to numeric datatypes
 # (The API returns numbers as strings, issue #236)
-beatmaps.isintcol <- sapply(beatmaps, function(col) all(check.numeric(col, only.integer=TRUE))) 
-beatmaps.isnumcol <- sapply(beatmaps, function(col) all(check.numeric(col))) & !beatmaps.isintcol
-beatmaps[, beatmaps.isintcol] <- sapply(beatmaps[, beatmaps.isintcol], as.integer)
-beatmaps[, beatmaps.isnumcol] <- sapply(beatmaps[, beatmaps.isnumcol], as.numeric)
+beatmaps <- colwise(parse_guess)(beatmaps)
 
 # Write beatmap data as CSV
-write.csv(beatmaps, "beatmaps.csv", row.names=FALSE)
+write_csv(beatmaps, "beatmaps.csv") 
 ```
 
 ```{r}
