@@ -1,15 +1,20 @@
+library(tidyverse)
 library(jsonlite)
 library(plyr)
+
 # Read from JSON and remove duplicate rows
-rankings <- unique(do.call("rbind", fromJSON("rankings.json")))
+rankings <- unique(fromJSON("rankings.json"))
 
 # Convert values to correct data types
-rankings.intvar <-!(names(rankings) %in% c("date", "rank", "pp"))
-rankings[ , rankings.intvar] <- sapply(rankings[ , rankings.intvar], as.integer)
-rankings$pp <- as.numeric(rankings$pp)
+rankings <- colwise(parse_guess)(rankings)
 
-write.csv(rankings, "rankings.csv", row.names=FALSE)
+write_csv(rankings, "rankings.csv")
 
-# convert datetime POSIXct 
+# Basic analysis
+length(unique(rankings$beatmap_id))  # ~13000 unique std maps
 
-unique(rankings$beatmap_id)  # ~4500 unique mania maps
+# Players with less than 100 top plays
+rankings %>% 
+  group_by(user_id) %>%
+  dplyr::summarize(n = n()) %>%
+  filter(n < 100)
