@@ -13,10 +13,10 @@ rankings <- rankings %>% lapply(unique)
 # Convert values to correct data types
 rankings <- rankings %>% lapply(plyr::colwise(parse_guess))
 
-write_csv(rankings$rankings0, "rankings0.csv")
-write_csv(rankings$rankings1, "rankings1.csv")
-write_csv(rankings$rankings2, "rankings2.csv")
-write_csv(rankings$rankings3, "rankings3.csv")
+write_csv(rankings$rankings0, "top10kuserscores0.csv")
+write_csv(rankings$rankings1, "top10kuserscores1.csv")
+write_csv(rankings$rankings2, "top10kuserscores2.csv")
+write_csv(rankings$rankings3, "top10kuserscores3.csv")
 
 # Basic analysis
 rankings0 <- rankings$rankings0
