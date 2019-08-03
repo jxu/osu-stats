@@ -9,13 +9,14 @@ import math
 import argparse
 import requests
 
+
 class Progress:
-    '''Organize seen information used in the process of making many API calls
+    """Organize seen information used in the process of making many API calls
     to be saved and reloaded.
 
     Attributes:
         json_list: list of info to be JSON dumped
-    '''
+    """
 
     def __init__(self):
         self.json_list = []
@@ -68,7 +69,6 @@ def download_map_info(api_key,
         since_date_str = progress.since  # Load since date
         print("Loaded since date", since_date_str)
 
-
     else:
         print("Creating new Progress instance")
         progress = Progress()
@@ -89,7 +89,8 @@ def download_map_info(api_key,
             print(info_dicts)
             raise Exception("info_dict error")
 
-        if not info_dicts: break  # Empty JSON, end of map search
+        if not info_dicts:
+            break  # Empty JSON, end of map search
 
         # Add info dict to progress
         progress.json_list.extend(info_dicts)
@@ -103,14 +104,12 @@ def download_map_info(api_key,
                   info_dict["title"],
                   info_dict["version"]))
 
-
         # Write out progress
         # TODO: save less often
         progress.since = since_date_str
         print("Writing progress to", progress_file)
         print("Maps:", len(progress.json_list))
         progress.save(progress_file)
-
 
         # When the API returns 500 results, last mapset may have diffs cut off.
         # Therefore, the whole mapset needs to be read again. The API's "since"
@@ -124,7 +123,6 @@ def download_map_info(api_key,
             end_date -= datetime.timedelta(seconds=1)
         since_date_str = end_date.strftime(MYSQL_TIMESTAMP_FMT)
 
-
     session.close()
 
     # Final write
@@ -133,9 +131,10 @@ def download_map_info(api_key,
 
 
 def scrape_rankings(gamemode=0, country=None, min_page=1, max_page=200):
-    '''Scrape rankings pages (one request at a time) for user IDs.
+    """Scrape rankings pages (one request at a time) for user IDs.
     https://github.com/ppy/osu-api/issues/102
-    '''
+    """
+
     RANKINGS_URL = "https://old.ppy.sh/p/pp"
     user_ids = []
 
@@ -158,7 +157,6 @@ def scrape_rankings(gamemode=0, country=None, min_page=1, max_page=200):
             if link.startswith("/u"):
                 user_ids.append(int(link.split("/u/")[1]))
 
-
     session.close()
     return user_ids
 
@@ -175,12 +173,13 @@ def download_rankings(api_key,
                       top_scores=100,
                       start_rank=0,
                       end_rank=10000):
-    '''WIP Download top (100) scores of top (10k) users.
-     Due to API rate limit, progress is stored.
-     TODO: needs more testing.
-     TODO: move batch API calling routine to own function.
-     That way program can just scrape top users and not dl scores.
-     '''
+    """WIP Download top (100) scores of top (10k) users.
+    Due to API rate limit, progress is stored.
+    TODO: needs more testing.
+    TODO: move batch API calling routine to own function.
+    That way program can just scrape top users and not dl scores.
+    """
+
     API_URL = "https://osu.ppy.sh/api/get_user_best"
     BATCH_REQUESTS = 100
     BATCH_INTERVAL = 5   # seconds
@@ -254,7 +253,7 @@ def main():
                         help="File to read API key. Defaults to api.key")
     parser.add_argument("-m", dest="gamemode", type=int,
                         help="Game mode " +
-                             "(0 = osu!, 1 = Taiko, 2 = CtB, 3 = osu!mania)\n"+
+                             "(0 = osu!, 1 = Taiko, 2 = CtB, 3 = osu!mania)\n" +
                              "Defaults to all gamemodes")
 
 
