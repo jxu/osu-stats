@@ -273,7 +273,7 @@ def main():
 
     elif args.command == "rankings":
         # treat blank gamemode as 0
-        if args.gamemode is not None:
+        if args.gamemode is None:
             args.gamemode = 0
 
         download_rankings(API_KEY,
