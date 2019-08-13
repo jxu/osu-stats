@@ -2,61 +2,53 @@
 title: "osu! Beatmap Stats"
 output: 
   html_document:
-    toc:  true
+    toc: true
+    codefolding: true
 ---
 
 # Introduction
 
-Basic data visualization of beatmap info provided by osu! API. https://github.com/ppy/osu-api/wiki
+The [osu! API](https://github.com/ppy/osu-api/wiki) allows anyone with an API key to retrieve lots of information about beatmaps, users, scores, multiplayer, etc. In particular we can get information on all ranked/loved/qualified maps, of which there are about ~83,000 of them as of August 2019. (A few maps, due to ranked/loved irregularities, are actually pending/WIP/graveyard but included in the API queries anyway.)
 
-Only uses ranked/loved/qualified maps. Graphs focusing on standard mode. 
+This lets us generate interesting statistics and visualizations about all beatmaps, which to my knowledge have never been done before. This report focuses on standard maps. In this R Markdown document, all the code is embedded with this report, so you can see what I'm doing and try it for yourself. If you are interested in something in particular that wasn't covered here, don't hesistate to let me know. 
 
-(A few maps, due to ranked/loved irregularities, are actually in graveyard but included in the API query anyway. Ex. https://osu.ppy.sh/b/766190&m=2 with 1 loved CtB diff.)
 
-```{r}
+```{r setup, include=FALSE}
 library(tidyverse)
 library(gridExtra)
 library(jsonlite)
 library(varhandle)
 library(chron)
-library(plyr)
-```
 
-```{r setup, include=FALSE}
 # Set global figure width and height
 knitr::opts_chunk$set(fig.width=10, fig.height=6) 
 ```
 
 
-```{r, cache=TRUE}
+```{r rw_data, cache=TRUE}
 # Cached chunk: Import data from JSON and remove duplicate rows
 beatmaps <- unique(fromJSON("maps.json"))
 
 # Convert strings of ints and floats to numeric datatypes
 # (The API returns numbers as strings, issue #236)
-beatmaps <- colwise(parse_guess)(beatmaps)
+beatmaps <- plyr::colwise(parse_guess)(beatmaps)
 
 # Write beatmap data as CSV
 write_csv(beatmaps, "beatmaps.csv") 
 ```
 
 ```{r}
-# Convert MySQL datetimes to R datetimes. As far as the new site goes, this appears to be UTC-4, but
-# this may be a local thing. Probably broken. 
-beatmaps$approved_date <- as.POSIXct(beatmaps$approved_date, tz="Etc/GMT+4")
-beatmaps$last_update <- as.POSIXct(beatmaps$last_update, tz="Etc/GMT+4")
-
 # Assign difficulty rating by spread ranges to spread names 
 beatmaps$spread_name <- spread.names[cut(beatmaps$difficultyrating, right=FALSE, labels=FALSE)]
 
 beatmaps$month <- cut(beatmaps$approved_date, breaks="month")
 
-# Create labels and data frames for each gamemode
-gamemodes <- c("std", "taiko", "ctb", "mania")
-gamemode.labels <- c("Standard", "Taiko", "CtB", "Mania")
-beatmaps$mode <- factor(beatmaps$mode, labels=gamemode.labels)
+gamemode_labels <- c("Standard", "Taiko", "CtB", "Mania")
+beatmaps <- beatmaps %>%
+  mutate(mode_name = gamemode_labels[mode+1])
 
-std <- beatmaps[beatmaps$mode == "Standard",]  # update std 
+# convenience, not sure if to keep or not
+std <- beatmaps %>% filter(mode == 0)  
 
 # Various plot parameters for convenience
 # These will usually leave a few outlier maps out
